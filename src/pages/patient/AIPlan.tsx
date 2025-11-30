@@ -285,7 +285,8 @@ const AIPlan: React.FC = () => {
 
   const sendToBackendAPI = async (imageData: string): Promise<SadnessAnalysisResult> => {
     try {
-      const backendUrl = 'http://localhost:5000';
+      // Use environment variable for backend URL, fallback to localhost for development
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
       
       // First check if backend is running
       try {

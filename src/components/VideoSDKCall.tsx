@@ -102,8 +102,8 @@ function ParticipantView({ participantId, isLarge = false }: { participantId: st
   return (
     <div className={`relative rounded-xl overflow-hidden shadow-lg ${
       isLarge 
-        ? "w-full h-full min-h-[400px]" 
-        : "w-44 h-32 border-2 border-white/20"
+        ? "w-full h-full" 
+        : "w-36 h-24 border-2 border-white/20"
     }`}>
       {/* Audio element - muted only for local to prevent echo */}
       <audio ref={micRef} autoPlay playsInline muted={isLocal} />
@@ -271,9 +271,9 @@ function MeetingView({
   }
 
   return (
-    <div className={`bg-gray-900 text-white flex flex-col ${isFullscreen ? "fixed inset-0 z-50" : "h-[600px] rounded-xl overflow-hidden"}`}>
+    <div className={`bg-gray-900 text-white flex flex-col ${isFullscreen ? "fixed inset-0 z-50" : "h-[450px] rounded-xl overflow-hidden"}`}>
       {/* Header */}
-      <div className="bg-gray-800/80 backdrop-blur-sm px-4 py-3 flex items-center justify-between border-b border-gray-700">
+      <div className="bg-gray-800/80 backdrop-blur-sm px-3 py-2 flex items-center justify-between border-b border-gray-700">
         <div className="flex items-center gap-4">
           <Badge className="bg-green-600 hover:bg-green-600">
             <div className="w-2 h-2 bg-white rounded-full animate-pulse mr-2" />
@@ -310,11 +310,11 @@ function MeetingView({
       </div>
 
       {/* Video Grid */}
-      <div className="flex-1 p-4 relative">
+      <div className="flex-1 p-2 relative">
         {participantIds.length === 0 ? (
           <div className="w-full h-full flex items-center justify-center">
             <div className="text-center">
-              <div className="w-12 h-12 border-4 border-gray-600 border-t-primary rounded-full animate-spin mx-auto mb-4" />
+              <div className="w-10 h-10 border-3 border-gray-600 border-t-primary rounded-full animate-spin mx-auto mb-3" />
               <p className="text-gray-400">Connecting...</p>
             </div>
           </div>
@@ -327,20 +327,20 @@ function MeetingView({
                   <ParticipantView participantId={participantId} key={participantId} isLarge={true} />
                 ))
               ) : (
-                <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl flex items-center justify-center">
+                <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg flex items-center justify-center">
                   <div className="text-center">
-                    <div className="w-20 h-20 rounded-full bg-gray-700 flex items-center justify-center mx-auto mb-4">
-                      <Users className="w-10 h-10 text-gray-500" />
+                    <div className="w-14 h-14 rounded-full bg-gray-700 flex items-center justify-center mx-auto mb-3">
+                      <Users className="w-7 h-7 text-gray-500" />
                     </div>
-                    <p className="text-gray-400 text-lg">Waiting for other participant...</p>
-                    <p className="text-gray-500 text-sm mt-2">Share the meeting ID to invite them</p>
+                    <p className="text-gray-400 text-base">Waiting for other participant...</p>
+                    <p className="text-gray-500 text-xs mt-1">Share the meeting ID to invite them</p>
                   </div>
                 </div>
               )}
             </div>
             
             {/* Local participant (small, picture-in-picture) */}
-            <div className="absolute bottom-6 right-6 z-10">
+            <div className="absolute bottom-3 right-3 z-10">
               {participantIds.filter(id => participants.get(id)?.local).map((participantId) => (
                 <ParticipantView participantId={participantId} key={participantId} isLarge={false} />
               ))}
@@ -350,7 +350,7 @@ function MeetingView({
       </div>
 
       {/* Controls */}
-      <div className="bg-gray-800/80 backdrop-blur-sm px-4 py-4 border-t border-gray-700">
+      <div className="bg-gray-800/80 backdrop-blur-sm px-3 py-2 border-t border-gray-700">
         <Controls />
       </div>
     </div>
