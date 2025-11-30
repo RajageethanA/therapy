@@ -26,25 +26,42 @@ import * as jose from 'jose';
 const VIDEOSDK_API_KEY = import.meta.env.VITE_VIDEOSDK_API_KEY || '';
 const VIDEOSDK_SECRET = import.meta.env.VITE_VIDEOSDK_SECRET || '';
 const VIDEOSDK_TOKEN = import.meta.env.VITE_VIDEOSDK_TOKEN || ''; // Pre-generated token from dashboard
+const VIDEOSDK_TOKEN_SERVER = import.meta.env.VITE_VIDEOSDK_TOKEN_SERVER || ''; // Token server URL (e.g., https://your-token-server.com/get-token)
 
 // Generate JWT token for VideoSDK
 const getToken = async (): Promise<string> => {
-  console.log('getToken called, API_KEY exists:', !!VIDEOSDK_API_KEY, 'SECRET exists:', !!VIDEOSDK_SECRET);
+  console.log('getToken called');
+  console.log('- API_KEY exists:', !!VIDEOSDK_API_KEY);
+  console.log('- SECRET exists:', !!VIDEOSDK_SECRET);
+  console.log('- TOKEN_SERVER:', VIDEOSDK_TOKEN_SERVER || 'not set');
   
-  // First try to generate token dynamically using API key and secret
+  // Option 1: Use Token Server URL if provided
+  if (VIDEOSDK_TOKEN_SERVER) {
+    try {
+      console.log('Fetching token from server:', VIDEOSDK_TOKEN_SERVER);
+      const response = await fetch(VIDEOSDK_TOKEN_SERVER);
+      if (response.ok) {
+        const data = await response.json();
+        const token = data.token || data;
+        console.log('Got token from server:', String(token).substring(0, 50) + '...');
+        return token;
+      }
+    } catch (error) {
+      console.error('Error fetching token from server:', error);
+    }
+  }
+  
+  // Option 2: Generate token dynamically using API key and secret
   if (VIDEOSDK_API_KEY && VIDEOSDK_SECRET) {
     try {
-      // Create JWT payload - VideoSDK specific format (must match their expected structure)
       const payload = {
         apikey: VIDEOSDK_API_KEY,
         permissions: ['allow_join', 'allow_mod'],
-        version: 2, // Required for v2 API
+        version: 2,
       };
 
-      // Create secret key from the secret string
       const secretKey = new TextEncoder().encode(VIDEOSDK_SECRET);
 
-      // Generate JWT token using jose library
       const token = await new jose.SignJWT(payload)
         .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
         .setIssuedAt()
@@ -58,13 +75,13 @@ const getToken = async (): Promise<string> => {
     }
   }
 
-  // Fallback to pre-generated token if dynamic generation fails
+  // Option 3: Use pre-generated token from dashboard
   if (VIDEOSDK_TOKEN) {
     console.log('Using pre-generated VideoSDK token');
     return VIDEOSDK_TOKEN;
   }
 
-  throw new Error('VideoSDK credentials not configured');
+  throw new Error('VideoSDK credentials not configured. Set VITE_VIDEOSDK_TOKEN_SERVER, or VITE_VIDEOSDK_API_KEY + VITE_VIDEOSDK_SECRET, or VITE_VIDEOSDK_TOKEN');
 };
 
 // Create meeting function
