@@ -34,20 +34,21 @@ const getToken = async (): Promise<string> => {
   // First try to generate token dynamically using API key and secret
   if (VIDEOSDK_API_KEY && VIDEOSDK_SECRET) {
     try {
-      // Create JWT payload - VideoSDK specific format
+      // Create JWT payload - VideoSDK specific format (must match their expected structure)
       const payload = {
         apikey: VIDEOSDK_API_KEY,
-        permissions: ['allow_join', 'allow_mod'], // Both permissions needed
+        permissions: ['allow_join', 'allow_mod'],
+        version: 2, // Required for v2 API
       };
 
       // Create secret key from the secret string
       const secretKey = new TextEncoder().encode(VIDEOSDK_SECRET);
 
-      // Generate JWT token using jose library with proper options
+      // Generate JWT token using jose library
       const token = await new jose.SignJWT(payload)
         .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
         .setIssuedAt()
-        .setExpirationTime('2h') // 2 hours expiration
+        .setExpirationTime('2h')
         .sign(secretKey);
 
       console.log('Generated VideoSDK token dynamically:', token.substring(0, 50) + '...');
@@ -69,10 +70,12 @@ const getToken = async (): Promise<string> => {
 // Create meeting function
 const createMeeting = async (token: string): Promise<string> => {
   try {
+    console.log('Creating meeting with token:', token.substring(0, 50) + '...');
+    
     const response = await fetch('https://api.videosdk.live/v2/rooms', {
       method: 'POST',
       headers: {
-        'Authorization': token,
+        'Authorization': `${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({}),
@@ -85,6 +88,7 @@ const createMeeting = async (token: string): Promise<string> => {
     }
     
     const data = await response.json();
+    console.log('Meeting created successfully:', data.roomId);
     if (!data.roomId) {
       throw new Error('No roomId in response');
     }
