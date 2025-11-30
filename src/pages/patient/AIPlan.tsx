@@ -323,7 +323,12 @@ const AIPlan: React.FC = () => {
 
       // Extract sadness analysis results
       const sadnessData = data.sadness_analysis;
-      const therapyData = data.therapy;
+      let therapyData = data.therapy;
+
+      // If backend didn't return therapy data, generate fallback based on severity
+      if (!therapyData) {
+        therapyData = generateFallbackTherapy(sadnessData.severity_level);
+      }
 
       // Update daily stats with insights
       if (therapyData) {
@@ -342,7 +347,7 @@ const AIPlan: React.FC = () => {
         severityLevel: sadnessData.severity_level,
         recommendTherapist: sadnessData.recommend_therapist,
         emotionBreakdown: data.emotion_breakdown,
-        therapy: therapyData || undefined
+        therapy: therapyData
       };
 
     } catch (error) {
@@ -406,6 +411,72 @@ const AIPlan: React.FC = () => {
         encouragement: "Remember, it's okay to not be okay. You're taking a positive step by checking in with yourself."
       }
     };
+  };
+
+  // Generate fallback therapy recommendations based on severity
+  const generateFallbackTherapy = (severityLevel: string) => {
+    if (severityLevel === 'severe') {
+      return {
+        acknowledgment: "We understand you're going through a very difficult time. Your feelings are valid, and it takes courage to acknowledge them.",
+        immediate_coping: [
+          "Practice the 4-7-8 breathing technique: breathe in for 4 seconds, hold for 7, exhale for 8",
+          "Try the 5-4-3-2-1 grounding exercise: name 5 things you see, 4 you touch, 3 you hear, 2 you smell, 1 you taste",
+          "Place your hand on your heart and take slow, deep breaths while saying 'I am safe right now'"
+        ],
+        coping_strategies: [
+          "Reach out to a trusted friend, family member, or crisis helpline",
+          "Write down your thoughts in a journal without judgment",
+          "Take a short walk outside, even just for 5 minutes",
+          "Listen to calming music or nature sounds",
+          "Practice progressive muscle relaxation"
+        ],
+        therapist_recommendation: "Based on your sadness levels, we strongly encourage speaking with a mental health professional. A therapist can provide personalized support and coping strategies.",
+        why_see_therapist: "Professional support can make a significant difference when sadness feels overwhelming. Therapists are trained to help you develop healthy coping mechanisms and work through difficult emotions.",
+        emergency_resources: "If you're in crisis, please reach out: National Suicide Prevention Lifeline: 988 | Crisis Text Line: Text HOME to 741741",
+        encouragement: "You are not alone in this. Seeking help is a sign of strength, not weakness. Every small step you take matters.",
+        recommend_therapist: true
+      };
+    } else if (severityLevel === 'moderate') {
+      return {
+        acknowledgment: "We see that you're experiencing some sadness. It's completely normal to have days like this, and acknowledging your feelings is an important first step.",
+        coping_strategies: [
+          "Take a 15-20 minute walk in nature or around your neighborhood",
+          "Practice deep breathing exercises for 5-10 minutes",
+          "Connect with a friend or family member - even a short conversation can help",
+          "Engage in a hobby or activity you enjoy",
+          "Write in a gratitude journal - list 3 things you're thankful for"
+        ],
+        daily_routine: [
+          "Start your morning with gentle stretching or yoga",
+          "Take breaks throughout the day to check in with yourself",
+          "End your evening with a calming activity like reading or meditation"
+        ],
+        mood_boosters: [
+          "Listen to uplifting music",
+          "Watch something that makes you laugh",
+          "Spend time with a pet or in nature"
+        ],
+        consider_therapist: "If these feelings persist for more than two weeks, consider reaching out to a mental health professional for additional support.",
+        encouragement: "You're doing great by taking time to understand your emotions. Remember that sadness is temporary, and brighter days are ahead.",
+        recommend_therapist: false
+      };
+    } else {
+      return {
+        acknowledgment: "Your emotional wellness is looking good! It's wonderful that you're taking time to check in with yourself.",
+        self_care_tips: [
+          "Continue your positive habits and self-care routines",
+          "Practice gratitude by noting 3 good things each day",
+          "Stay connected with friends and loved ones"
+        ],
+        mood_boosters: [
+          "Try a new hobby or creative activity",
+          "Spend time outdoors and enjoy nature",
+          "Do something kind for yourself or others"
+        ],
+        encouragement: "Keep up the great work! Maintaining emotional awareness is key to long-term mental wellness.",
+        recommend_therapist: false
+      };
+    }
   };
 
   const stopCamera = () => {
