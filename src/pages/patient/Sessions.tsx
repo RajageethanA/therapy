@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { useUser } from '@/contexts/UserContext';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, query, where, orderBy, doc, updateDoc, getDoc } from 'firebase/firestore';
@@ -62,6 +63,7 @@ export default function Sessions() {
     meetingId?: string; // VideoSDK meeting room ID
   } | null>(null);
   const [requestingVideoCall, setRequestingVideoCall] = useState<string | null>(null);
+  const [roomIdInput, setRoomIdInput] = useState<Record<string, string>>({}); // Room ID input per session
 
   // Function to request video call
   const requestVideoCall = async (sessionId: string, therapistId: string, therapistName: string) => {
@@ -400,19 +402,36 @@ export default function Sessions() {
                                     );
                                   })()
                                 ) : session.videoCallRequest.status === 'accepted' && session.videoCallStatus === 'active' ? (
-                                  // Request accepted and call is active - show join button
-                                  <Button 
-                                    className="flex-1 bg-green-600 hover:bg-green-700"
-                                    onClick={() => joinVideoCall(
-                                      session.id, 
-                                      session.therapistId, 
-                                      session.therapistName || therapists[session.therapistId]?.name || 'Therapist',
-                                      session.meetingId || ''
-                                    )}
-                                  >
-                                    <Video className="w-4 h-4 mr-2" />
-                                    Join Video Session
-                                  </Button>
+                                  // Request accepted and call is active - show room ID input and join button
+                                  <div className="flex-1 flex flex-col gap-2">
+                                    <div className="flex gap-2">
+                                      <Input
+                                        placeholder="Enter Room ID from Therapist"
+                                        value={roomIdInput[session.id] || session.meetingId || ''}
+                                        onChange={(e) => setRoomIdInput(prev => ({
+                                          ...prev,
+                                          [session.id]: e.target.value
+                                        }))}
+                                        className="flex-1"
+                                      />
+                                      <Button 
+                                        className="bg-green-600 hover:bg-green-700"
+                                        disabled={!roomIdInput[session.id] && !session.meetingId}
+                                        onClick={() => joinVideoCall(
+                                          session.id, 
+                                          session.therapistId, 
+                                          session.therapistName || therapists[session.therapistId]?.name || 'Therapist',
+                                          roomIdInput[session.id] || session.meetingId || ''
+                                        )}
+                                      >
+                                        <Video className="w-4 h-4 mr-2" />
+                                        Join
+                                      </Button>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">
+                                      Ask your therapist for the Room ID to join the video call
+                                    </p>
+                                  </div>
                                 ) : session.videoCallRequest.status === 'declined' ? (
                                   // Request declined - allow new request
                                   <Button 
@@ -427,11 +446,49 @@ export default function Sessions() {
                                     <Video className="w-4 h-4 mr-2" />
                                     Request Video Call Again
                                   </Button>
+                                ) : session.videoCallRequest.status === 'accepted' ? (
+                                  // Request accepted - show room ID input to join
+                                  <div className="flex-1 flex flex-col gap-2">
+                                    <div className="flex gap-2">
+                                      <Input
+                                        placeholder="Enter Room ID from Therapist"
+                                        value={roomIdInput[session.id] || ''}
+                                        onChange={(e) => setRoomIdInput(prev => ({
+                                          ...prev,
+                                          [session.id]: e.target.value
+                                        }))}
+                                        className="flex-1"
+                                      />
+                                      <Button 
+                                        className="bg-green-600 hover:bg-green-700"
+                                        disabled={!roomIdInput[session.id]}
+                                        onClick={() => joinVideoCall(
+                                          session.id, 
+                                          session.therapistId, 
+                                          session.therapistName || therapists[session.therapistId]?.name || 'Therapist',
+                                          roomIdInput[session.id] || ''
+                                        )}
+                                      >
+                                        <Video className="w-4 h-4 mr-2" />
+                                        Join
+                                      </Button>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">
+                                      ✅ Call approved! Enter the Room ID shared by your therapist to join.
+                                    </p>
+                                  </div>
                                 ) : (
-                                  // Request accepted but call not started yet
-                                  <Button variant="outline" className="flex-1" disabled>
+                                  // Unknown state - allow new request
+                                  <Button 
+                                    className="flex-1 bg-blue-600 hover:bg-blue-700"
+                                    onClick={() => requestVideoCall(
+                                      session.id, 
+                                      session.therapistId, 
+                                      session.therapistName || therapists[session.therapistId]?.name || 'Therapist'
+                                    )}
+                                  >
                                     <Video className="w-4 h-4 mr-2" />
-                                    Video Call Approved - Waiting for Therapist
+                                    Request Video Call
                                   </Button>
                                 )}
                               </>
