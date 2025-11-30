@@ -6,9 +6,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { useUser } from '@/contexts/UserContext';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, query, where, orderBy, doc, updateDoc, addDoc, serverTimestamp, getDoc } from 'firebase/firestore';
-import { FileText, Calendar, Clock, CheckCircle, XCircle, MessageSquare, User, Mail, Phone, Calendar as BirthdayIcon, MapPin, Activity, Video, VideoOff } from 'lucide-react';
+import { FileText, Calendar, Clock, CheckCircle, XCircle, MessageSquare, User, Mail, Phone, Calendar as BirthdayIcon, MapPin, Activity, Video, VideoOff, Copy } from 'lucide-react';
 import { format } from 'date-fns';
-import VideoCall from '@/components/VideoCall';
+import VideoSDKCall, { createMeeting, getToken } from '@/components/VideoSDKCall';
 
 type Session = {
   id: string;
@@ -64,6 +64,7 @@ export default function TherapistSessions() {
     sessionId: string;
     patientName: string;
     patientId: string;
+    meetingId?: string; // VideoSDK meeting room ID
   } | null>(null);
   const [videoCallLoading, setVideoCallLoading] = useState<string | null>(null);
 
@@ -232,18 +233,31 @@ export default function TherapistSessions() {
   const startVideoCall = async (sessionId: string, patientId: string, patientName: string) => {
     setVideoCallLoading(sessionId);
     try {
-      // Update session with video call info
+      // Get token and create VideoSDK meeting room
+      const token = await getToken();
+      const meetingId = await createMeeting(token);
+      
+      // Update session with video call info including the VideoSDK room ID
       const sessionRef = doc(db, 'sessions', sessionId);
       await updateDoc(sessionRef, {
         videoCallStarted: serverTimestamp(),
         videoCallStatus: 'active',
+        videoCallRoomId: meetingId, // Store VideoSDK room ID for patient to join
       });
+
+      // Update local sessions state with the new room ID
+      setSessions(prev => prev.map(s => 
+        s.id === sessionId 
+          ? { ...s, videoCallStatus: 'active', videoCallRoomId: meetingId }
+          : s
+      ));
 
       // Set active video call with all needed info
       setActiveVideoCall({
         sessionId,
         patientName,
-        patientId
+        patientId,
+        meetingId, // Include the VideoSDK meeting ID
       });
       
     } catch (error) {
@@ -824,15 +838,16 @@ export default function TherapistSessions() {
         </div>
       </div>
 
-      {/* Video Call Component - Render when call is active */}
+      {/* VideoSDK Call Component - Render when call is active */}
       {activeVideoCall && (
         <div className="fixed inset-0 z-50 bg-black">
-          <VideoCall
+          <VideoSDKCall
             sessionId={activeVideoCall.sessionId}
             participantName={activeVideoCall.patientName}
             participantRole="patient"
             onCallEnd={endVideoCall}
             isHost={true}
+            meetingId={activeVideoCall.meetingId}
           />
         </div>
       )}

@@ -8,7 +8,7 @@ import { db } from '@/lib/firebase';
 import { collection, getDocs, query, where, orderBy, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { Calendar, Clock, Video, FileText, User, Mail, Phone, Star, Award, MapPin, Activity } from 'lucide-react';
 import { format } from 'date-fns';
-import VideoCall from '@/components/VideoCall';
+import VideoSDKCall from '@/components/VideoSDKCall';
 
 type Session = {
   id: string;
@@ -23,6 +23,7 @@ type Session = {
   notes?: string;
   videoCallRoomId?: string;
   videoCallStatus?: 'active' | 'ended' | 'scheduled';
+  meetingId?: string; // VideoSDK meeting room ID
   videoCallRequest?: {
     status: 'pending' | 'accepted' | 'declined';
     requestedAt: any;
@@ -58,6 +59,7 @@ export default function Sessions() {
     sessionId: string;
     therapistName: string;
     therapistId: string;
+    meetingId?: string; // VideoSDK meeting room ID
   } | null>(null);
   const [requestingVideoCall, setRequestingVideoCall] = useState<string | null>(null);
 
@@ -98,12 +100,13 @@ export default function Sessions() {
     }
   };
 
-  // Function to join video call (when therapist accepts)
-  const joinVideoCall = (sessionId: string, therapistId: string, therapistName: string) => {
+  // Function to join video call (when therapist accepts and starts the call)
+  const joinVideoCall = (sessionId: string, therapistId: string, therapistName: string, meetingId: string) => {
     setActiveVideoCall({
       sessionId,
       therapistName,
-      therapistId
+      therapistId,
+      meetingId, // VideoSDK meeting room ID from the session
     });
   };
 
@@ -380,7 +383,8 @@ export default function Sessions() {
                                     onClick={() => joinVideoCall(
                                       session.id, 
                                       session.therapistId, 
-                                      session.therapistName || therapists[session.therapistId]?.name || 'Therapist'
+                                      session.therapistName || therapists[session.therapistId]?.name || 'Therapist',
+                                      session.meetingId || ''
                                     )}
                                   >
                                     <Video className="w-4 h-4 mr-2" />
@@ -563,15 +567,16 @@ export default function Sessions() {
         </div>
       </div>
 
-      {/* Video Call Component - Render when call is active */}
-      {activeVideoCall && (
+      {/* VideoSDK Call Component - Render when call is active */}
+      {activeVideoCall && activeVideoCall.meetingId && (
         <div className="fixed inset-0 z-50 bg-black">
-          <VideoCall
+          <VideoSDKCall
             sessionId={activeVideoCall.sessionId}
             participantName={activeVideoCall.therapistName}
             participantRole="therapist"
             onCallEnd={endVideoCall}
             isHost={false}
+            meetingId={activeVideoCall.meetingId}
           />
         </div>
       )}
