@@ -8,7 +8,7 @@ import { db } from '@/lib/firebase';
 import { collection, getDocs, query, where, orderBy, doc, updateDoc, addDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { FileText, Calendar, Clock, CheckCircle, XCircle, MessageSquare, User, Mail, Phone, Calendar as BirthdayIcon, MapPin, Activity, Video, VideoOff, Copy } from 'lucide-react';
 import { format } from 'date-fns';
-import VideoSDKCall, { createMeeting, getToken } from '@/components/VideoSDKCall';
+import VideoSDKCall, { createMeeting, getAuthToken } from '@/components/VideoSDKCall';
 
 type Session = {
   id: string;
@@ -234,8 +234,8 @@ export default function TherapistSessions() {
     setVideoCallLoading(sessionId);
     try {
       // Get token and create VideoSDK meeting room
-      const token = await getToken();
-      const meetingId = await createMeeting(token);
+      const token = await getAuthToken();
+      const meetingId = await createMeeting({ token });
       
       if (!meetingId) {
         throw new Error('Failed to create meeting room');

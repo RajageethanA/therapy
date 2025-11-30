@@ -15,6 +15,8 @@ import io
 import logging
 import json
 import random
+import jwt
+import time
 
 # Set TensorFlow environment variables before import
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
@@ -41,6 +43,10 @@ except Exception as e:
 # Load environment variables
 from dotenv import load_dotenv
 load_dotenv()
+
+# VideoSDK Configuration
+VIDEOSDK_API_KEY = os.getenv('VIDEOSDK_API_KEY', '')
+VIDEOSDK_SECRET = os.getenv('VIDEOSDK_SECRET', '')
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -708,6 +714,101 @@ def test_sadness():
 def test_emotion():
     """Legacy test endpoint - redirects to test_sadness"""
     return test_sadness()
+
+
+@app.route('/videosdk/token', methods=['GET'])
+def get_videosdk_token():
+    """
+    Generate a VideoSDK JWT token for video calls.
+    This endpoint generates tokens with both allow_join and allow_mod permissions.
+    """
+    try:
+        if not VIDEOSDK_API_KEY or not VIDEOSDK_SECRET:
+            return jsonify({
+                'error': 'VideoSDK credentials not configured',
+                'message': 'Set VIDEOSDK_API_KEY and VIDEOSDK_SECRET environment variables'
+            }), 500
+        
+        # Create JWT payload
+        payload = {
+            'apikey': VIDEOSDK_API_KEY,
+            'permissions': ['allow_join', 'allow_mod'],
+            'version': 2,
+            'iat': int(time.time()),
+            'exp': int(time.time()) + 86400  # 24 hours expiration
+        }
+        
+        # Generate token
+        token = jwt.encode(payload, VIDEOSDK_SECRET, algorithm='HS256')
+        
+        logger.info("✅ Generated VideoSDK token successfully")
+        
+        return jsonify({
+            'token': token
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Error generating VideoSDK token: {str(e)}")
+        return jsonify({
+            'error': str(e),
+            'message': 'Failed to generate VideoSDK token'
+        }), 500
+
+
+@app.route('/videosdk/create-meeting', methods=['POST'])
+def create_videosdk_meeting():
+    """
+    Create a new VideoSDK meeting room.
+    Returns the room ID that can be shared with participants.
+    """
+    try:
+        import requests
+        
+        if not VIDEOSDK_API_KEY or not VIDEOSDK_SECRET:
+            return jsonify({
+                'error': 'VideoSDK credentials not configured'
+            }), 500
+        
+        # Generate token first
+        payload = {
+            'apikey': VIDEOSDK_API_KEY,
+            'permissions': ['allow_join', 'allow_mod'],
+            'version': 2,
+            'iat': int(time.time()),
+            'exp': int(time.time()) + 86400
+        }
+        token = jwt.encode(payload, VIDEOSDK_SECRET, algorithm='HS256')
+        
+        # Create meeting using VideoSDK API
+        response = requests.post(
+            'https://api.videosdk.live/v2/rooms',
+            headers={
+                'authorization': token,
+                'Content-Type': 'application/json'
+            },
+            json={}
+        )
+        
+        if response.status_code != 200:
+            logger.error(f"VideoSDK API error: {response.status_code} - {response.text}")
+            return jsonify({
+                'error': f'VideoSDK API error: {response.status_code}',
+                'details': response.text
+            }), response.status_code
+        
+        data = response.json()
+        logger.info(f"✅ Created VideoSDK meeting: {data.get('roomId')}")
+        
+        return jsonify({
+            'roomId': data.get('roomId'),
+            'token': token
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Error creating VideoSDK meeting: {str(e)}")
+        return jsonify({
+            'error': str(e)
+        }), 500
 
 
 if __name__ == '__main__':

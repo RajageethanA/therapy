@@ -3,7 +3,6 @@ import {
   MeetingProvider,
   useMeeting,
   useParticipant,
-  MeetingConsumer,
 } from '@videosdk.live/react-sdk';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,135 +12,64 @@ import {
   Mic, 
   MicOff, 
   PhoneOff, 
-  Monitor,
   Maximize2,
   Minimize2,
   Users,
   Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import * as jose from 'jose';
 
-// VideoSDK credentials from environment variables
-const VIDEOSDK_API_KEY = import.meta.env.VITE_VIDEOSDK_API_KEY || '';
-const VIDEOSDK_SECRET = import.meta.env.VITE_VIDEOSDK_SECRET || '';
-const VIDEOSDK_TOKEN = import.meta.env.VITE_VIDEOSDK_TOKEN || ''; // Pre-generated token from dashboard
-const VIDEOSDK_TOKEN_SERVER = import.meta.env.VITE_VIDEOSDK_TOKEN_SERVER || ''; // Token server URL (e.g., https://your-token-server.com/get-token)
+// Token server URL - Backend endpoint that generates VideoSDK tokens
+const TOKEN_SERVER_URL = import.meta.env.VITE_VIDEOSDK_TOKEN_SERVER || 'http://localhost:5000/videosdk/token';
 
-// Generate JWT token for VideoSDK
-const getToken = async (): Promise<string> => {
-  console.log('getToken called');
-  console.log('- API_KEY exists:', !!VIDEOSDK_API_KEY);
-  console.log('- SECRET exists:', !!VIDEOSDK_SECRET);
-  console.log('- TOKEN_SERVER:', VIDEOSDK_TOKEN_SERVER || 'not set');
-  
-  // Option 1: Use Token Server URL if provided
-  if (VIDEOSDK_TOKEN_SERVER) {
-    try {
-      console.log('Fetching token from server:', VIDEOSDK_TOKEN_SERVER);
-      const response = await fetch(VIDEOSDK_TOKEN_SERVER);
-      if (response.ok) {
-        const data = await response.json();
-        const token = data.token || data;
-        console.log('Got token from server:', String(token).substring(0, 50) + '...');
-        return token;
-      }
-    } catch (error) {
-      console.error('Error fetching token from server:', error);
-    }
-  }
-  
-  // Option 2: Generate token dynamically using API key and secret
-  if (VIDEOSDK_API_KEY && VIDEOSDK_SECRET) {
-    try {
-      const payload = {
-        apikey: VIDEOSDK_API_KEY,
-        permissions: ['allow_join', 'allow_mod'],
-        version: 2,
-      };
-
-      const secretKey = new TextEncoder().encode(VIDEOSDK_SECRET);
-
-      const token = await new jose.SignJWT(payload)
-        .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
-        .setIssuedAt()
-        .setExpirationTime('2h')
-        .sign(secretKey);
-
-      console.log('Generated VideoSDK token dynamically:', token.substring(0, 50) + '...');
-      return token;
-    } catch (error) {
-      console.error('Error generating token dynamically:', error);
-    }
-  }
-
-  // Option 3: Use pre-generated token from dashboard
-  if (VIDEOSDK_TOKEN) {
-    console.log('Using pre-generated VideoSDK token');
-    return VIDEOSDK_TOKEN;
-  }
-
-  throw new Error('VideoSDK credentials not configured. Set VITE_VIDEOSDK_TOKEN_SERVER, or VITE_VIDEOSDK_API_KEY + VITE_VIDEOSDK_SECRET, or VITE_VIDEOSDK_TOKEN');
-};
-
-// Create meeting function
-const createMeeting = async (token: string): Promise<string> => {
+// Function to get auth token from server
+export const getAuthToken = async (): Promise<string> => {
   try {
-    console.log('Creating meeting with token:', token.substring(0, 50) + '...');
-    
-    const response = await fetch('https://api.videosdk.live/v2/rooms', {
-      method: 'POST',
-      headers: {
-        'Authorization': `${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({}),
-    });
+    console.log('Fetching token from:', TOKEN_SERVER_URL);
+    const response = await fetch(TOKEN_SERVER_URL);
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Create meeting failed:', response.status, errorText);
-      throw new Error(`Failed to create meeting: ${response.status}`);
+      console.error('Token server error:', response.status, errorText);
+      throw new Error(`Token server error: ${response.status}`);
     }
     
     const data = await response.json();
-    console.log('Meeting created successfully:', data.roomId);
-    if (!data.roomId) {
-      throw new Error('No roomId in response');
-    }
-    return data.roomId;
+    console.log('Token received successfully');
+    return data.token;
   } catch (error) {
-    console.error('Error creating meeting:', error);
+    console.error('Failed to get auth token:', error);
     throw error;
   }
 };
 
-// Validate meeting function
-const validateMeeting = async (token: string, meetingId: string): Promise<boolean> => {
-  try {
-    const response = await fetch(`https://api.videosdk.live/v2/rooms/validate/${meetingId}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': token,
-        'Content-Type': 'application/json',
-      },
-    });
-    
-    const data = await response.json();
-    return data.roomId === meetingId;
-  } catch (error) {
-    console.error('Error validating meeting:', error);
-    return false;
+// API call to create a meeting room
+export const createMeeting = async ({ token }: { token: string }): Promise<string> => {
+  const res = await fetch('https://api.videosdk.live/v2/rooms', {
+    method: 'POST',
+    headers: {
+      authorization: `${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({}),
+  });
+  
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error('Create meeting failed:', res.status, errorText);
+    throw new Error(`Failed to create meeting: ${res.status} - ${errorText}`);
   }
+  
+  const { roomId } = await res.json();
+  console.log('Meeting created:', roomId);
+  return roomId;
 };
 
-// Participant Video Component
-const ParticipantView: React.FC<{ participantId: string; isLocal?: boolean }> = ({ 
-  participantId, 
-  isLocal = false 
-}) => {
+// Participant View Component - renders each participant's video
+function ParticipantView({ participantId }: { participantId: string }) {
   const micRef = useRef<HTMLAudioElement>(null);
-  const { webcamStream, micStream, webcamOn, micOn, isLocal: isLocalParticipant, displayName } = useParticipant(participantId);
+  const { webcamStream, micStream, webcamOn, micOn, isLocal, displayName } = 
+    useParticipant(participantId);
 
   const videoStream = useMemo(() => {
     if (webcamOn && webcamStream) {
@@ -158,9 +86,9 @@ const ParticipantView: React.FC<{ participantId: string; isLocal?: boolean }> = 
         const mediaStream = new MediaStream();
         mediaStream.addTrack(micStream.track);
         micRef.current.srcObject = mediaStream;
-        micRef.current.play().catch((error) => {
-          console.error('Error playing audio:', error);
-        });
+        micRef.current
+          .play()
+          .catch((error) => console.error('Audio play failed:', error));
       } else {
         micRef.current.srcObject = null;
       }
@@ -169,9 +97,13 @@ const ParticipantView: React.FC<{ participantId: string; isLocal?: boolean }> = 
 
   return (
     <div className={cn(
-      "relative rounded-lg overflow-hidden bg-gray-800",
-      isLocal ? "w-32 h-24 absolute top-4 right-4 z-10 border-2 border-white/20" : "w-full h-full"
+      "relative rounded-xl overflow-hidden bg-gray-900",
+      isLocal ? "w-40 h-32 absolute top-4 right-4 z-10 border-2 border-white/30" : "flex-1 min-h-[400px]"
     )}>
+      {/* Audio element for mic */}
+      <audio ref={micRef} autoPlay playsInline muted={isLocal} />
+      
+      {/* Video */}
       {webcamOn && videoStream ? (
         <video
           autoPlay
@@ -185,50 +117,106 @@ const ParticipantView: React.FC<{ participantId: string; isLocal?: boolean }> = 
           className="w-full h-full object-cover"
         />
       ) : (
-        <div className="w-full h-full flex items-center justify-center bg-gray-700">
-          <div className="text-center">
-            <div className="w-16 h-16 rounded-full bg-gray-600 flex items-center justify-center mx-auto mb-2">
-              <span className="text-2xl font-bold text-white">
-                {displayName?.charAt(0)?.toUpperCase() || '?'}
-              </span>
-            </div>
-            <p className="text-white text-sm">{displayName || 'Participant'}</p>
-            <VideoOff className="w-4 h-4 text-gray-400 mx-auto mt-1" />
+        <div className="w-full h-full flex items-center justify-center bg-gray-800">
+          <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
+            <span className="text-2xl font-bold text-white">
+              {displayName?.charAt(0)?.toUpperCase() || '?'}
+            </span>
           </div>
         </div>
       )}
       
-      {/* Audio element for remote participant */}
-      {!isLocal && <audio ref={micRef} autoPlay muted={isLocalParticipant} />}
-      
-      {/* Participant name badge */}
-      <div className="absolute bottom-2 left-2 bg-black/60 px-2 py-1 rounded text-xs text-white flex items-center gap-1">
-        {!micOn && <MicOff className="w-3 h-3 text-red-400" />}
-        <span>{displayName || 'Participant'}</span>
-        {isLocal && <span className="text-gray-400">(You)</span>}
+      {/* Name and status overlay */}
+      <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+        <div className="bg-black/60 px-2 py-1 rounded text-white text-sm flex items-center gap-2">
+          <span>{displayName || 'Participant'}</span>
+          {isLocal && <Badge variant="secondary" className="text-xs">You</Badge>}
+        </div>
+        <div className="flex gap-1">
+          {!micOn && (
+            <div className="bg-red-500/80 p-1 rounded">
+              <MicOff className="w-3 h-3 text-white" />
+            </div>
+          )}
+          {!webcamOn && (
+            <div className="bg-red-500/80 p-1 rounded">
+              <VideoOff className="w-3 h-3 text-white" />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
-};
+}
 
-// Meeting View Component
-const MeetingView: React.FC<{
-  onCallEnd: () => void;
-  participantName: string;
-  isHost: boolean;
-}> = ({ onCallEnd, participantName, isHost }) => {
+// Controls Component - mic, webcam, leave buttons
+function Controls() {
+  const { leave, toggleMic, toggleWebcam } = useMeeting();
+  const [micOn, setMicOn] = useState(true);
+  const [webcamOn, setWebcamOn] = useState(true);
+
+  const handleToggleMic = () => {
+    toggleMic();
+    setMicOn(!micOn);
+  };
+
+  const handleToggleWebcam = () => {
+    toggleWebcam();
+    setWebcamOn(!webcamOn);
+  };
+
+  return (
+    <div className="flex items-center justify-center gap-4">
+      <Button
+        onClick={handleToggleMic}
+        size="lg"
+        variant={micOn ? "outline" : "destructive"}
+        className="rounded-full w-14 h-14 p-0"
+      >
+        {micOn ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}
+      </Button>
+
+      <Button
+        onClick={handleToggleWebcam}
+        size="lg"
+        variant={webcamOn ? "outline" : "destructive"}
+        className="rounded-full w-14 h-14 p-0"
+      >
+        {webcamOn ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
+      </Button>
+
+      <Button
+        onClick={() => leave()}
+        size="lg"
+        variant="destructive"
+        className="rounded-full w-14 h-14 p-0 bg-red-600 hover:bg-red-700"
+      >
+        <PhoneOff className="w-6 h-6" />
+      </Button>
+    </div>
+  );
+}
+
+// Meeting View Component - the actual meeting interface
+function MeetingView({ 
+  meetingId, 
+  onMeetingLeave 
+}: { 
+  meetingId: string; 
+  onMeetingLeave: () => void;
+}) {
+  const [joined, setJoined] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
   const callStartTimeRef = useRef<number>(Date.now());
 
-  const { join, leave, toggleMic, toggleWebcam, localMicOn, localWebcamOn, participants, meetingId } = useMeeting({
+  const { join, participants } = useMeeting({
     onMeetingJoined: () => {
-      console.log('Meeting joined successfully');
+      setJoined('JOINED');
       callStartTimeRef.current = Date.now();
     },
     onMeetingLeft: () => {
-      console.log('Meeting left');
-      onCallEnd();
+      onMeetingLeave();
     },
     onParticipantJoined: (participant) => {
       console.log('Participant joined:', participant.displayName);
@@ -236,26 +224,27 @@ const MeetingView: React.FC<{
     onParticipantLeft: (participant) => {
       console.log('Participant left:', participant.displayName);
     },
-    onError: (error) => {
-      console.error('Meeting error:', error);
-    },
   });
 
-  // Join meeting on mount
-  useEffect(() => {
+  const joinMeeting = () => {
+    setJoined('JOINING');
     join();
-    return () => {
-      // Cleanup on unmount
-    };
+  };
+
+  // Auto-join on mount
+  useEffect(() => {
+    joinMeeting();
   }, []);
 
   // Timer for call duration
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCallDuration(Math.floor((Date.now() - callStartTimeRef.current) / 1000));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
+    if (joined === 'JOINED') {
+      const timer = setInterval(() => {
+        setCallDuration(Math.floor((Date.now() - callStartTimeRef.current) / 1000));
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [joined]);
 
   const formatDuration = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -263,125 +252,136 @@ const MeetingView: React.FC<{
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  const handleLeave = () => {
-    leave();
-    onCallEnd();
+  const copyMeetingId = () => {
+    navigator.clipboard.writeText(meetingId);
+    alert('Room ID copied: ' + meetingId);
   };
 
   const participantIds = [...participants.keys()];
-  const remoteParticipantId = participantIds.find(id => !participants.get(id)?.local);
-  const localParticipantId = participantIds.find(id => participants.get(id)?.local);
+
+  if (joined === 'JOINING') {
+    return (
+      <div className="fixed inset-0 z-50 bg-black flex items-center justify-center">
+        <div className="text-center text-white">
+          <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4" />
+          <p className="text-lg">Joining the meeting...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={cn(
-      "video-call-container bg-black text-white",
-      isFullscreen ? "fixed inset-0 z-50" : "relative h-[500px] rounded-lg overflow-hidden"
+      "bg-gray-900 text-white flex flex-col",
+      isFullscreen ? "fixed inset-0 z-50" : "h-[600px] rounded-lg overflow-hidden"
     )}>
-      {/* Call Status Header */}
-      <div className="absolute top-0 left-0 right-0 z-20 bg-gradient-to-b from-black/70 to-transparent p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Badge className="bg-green-600">
-              <div className="w-2 h-2 bg-white rounded-full animate-pulse mr-2" />
-              Connected
-            </Badge>
-            <span className="text-sm font-medium">{participantName}</span>
-            <div className="flex items-center gap-1 text-gray-300 text-sm">
-              <Users className="w-4 h-4" />
-              <span>{participantIds.length}</span>
-            </div>
+      {/* Header */}
+      <div className="bg-gray-800 p-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Badge className="bg-green-600">
+            <div className="w-2 h-2 bg-white rounded-full animate-pulse mr-2" />
+            Live
+          </Badge>
+          <div className="flex items-center gap-1 text-gray-300 text-sm">
+            <Users className="w-4 h-4" />
+            <span>{participantIds.length}</span>
           </div>
-          
-          <div className="flex items-center gap-3">
-            <div className="text-sm font-mono text-gray-300 bg-black/40 px-2 py-1 rounded">
-              {formatDuration(callDuration)}
-            </div>
-            <div 
-              className="text-xs text-gray-400 bg-black/40 px-2 py-1 rounded cursor-pointer hover:bg-black/60 transition-colors"
-              onClick={() => {
-                navigator.clipboard.writeText(meetingId || '');
-                alert('Room ID copied! Share this with the patient: ' + meetingId);
-              }}
-              title="Click to copy Room ID"
-            >
-              📋 Room: <span className="font-mono font-bold text-white">{meetingId}</span>
-            </div>
-          </div>
+          <span className="text-sm font-mono text-gray-300">
+            {formatDuration(callDuration)}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={copyMeetingId}
+            className="text-gray-300 hover:text-white"
+          >
+            <span className="mr-2">📋</span>
+            <span className="font-mono text-xs">Room: {meetingId}</span>
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsFullscreen(!isFullscreen)}
+          >
+            {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+          </Button>
         </div>
       </div>
 
-      {/* Video Streams */}
-      <div className="relative w-full h-full">
-        {/* Remote Participant (Main) */}
-        {remoteParticipantId ? (
-          <ParticipantView participantId={remoteParticipantId} />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gray-800">
+      {/* Video Grid */}
+      <div className="flex-1 p-4 relative">
+        {participantIds.length === 0 ? (
+          <div className="w-full h-full flex items-center justify-center">
             <div className="text-center">
-              <Loader2 className="w-12 h-12 text-white animate-spin mx-auto mb-4" />
-              <p className="text-lg text-white">Waiting for {participantName} to join...</p>
-              <p className="text-sm text-gray-400 mt-2">Share the room ID with them</p>
-              <div className="mt-4 bg-black/40 px-4 py-2 rounded-lg">
-                <p className="text-xs text-gray-400">Room ID</p>
-                <p className="text-lg font-mono text-white">{meetingId}</p>
-              </div>
+              <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-gray-500" />
+              <p className="text-gray-400">Connecting...</p>
             </div>
           </div>
-        )}
-        
-        {/* Local Participant (Picture-in-Picture) */}
-        {localParticipantId && (
-          <ParticipantView participantId={localParticipantId} isLocal />
+        ) : (
+          participantIds.map((participantId) => (
+            <ParticipantView key={participantId} participantId={participantId} />
+          ))
         )}
       </div>
 
       {/* Controls */}
-      <div className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/70 to-transparent p-4">
-        <div className="flex items-center justify-center gap-4">
-          {/* Audio Control */}
-          <Button
-            onClick={() => toggleMic()}
-            size="lg"
-            variant={localMicOn ? "default" : "destructive"}
-            className="rounded-full w-12 h-12 p-0"
-          >
-            {localMicOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
-          </Button>
-
-          {/* Video Control */}
-          <Button
-            onClick={() => toggleWebcam()}
-            size="lg"
-            variant={localWebcamOn ? "default" : "destructive"}
-            className="rounded-full w-12 h-12 p-0"
-          >
-            {localWebcamOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
-          </Button>
-
-          {/* Fullscreen Toggle */}
-          <Button
-            onClick={() => setIsFullscreen(!isFullscreen)}
-            size="lg"
-            variant="outline"
-            className="rounded-full w-12 h-12 p-0"
-          >
-            {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
-          </Button>
-
-          {/* End Call */}
-          <Button
-            onClick={handleLeave}
-            size="lg"
-            variant="destructive"
-            className="rounded-full w-12 h-12 p-0 bg-red-600 hover:bg-red-700"
-          >
-            <PhoneOff className="w-5 h-5" />
-          </Button>
-        </div>
+      <div className="bg-gray-800 p-4">
+        <Controls />
       </div>
     </div>
   );
-};
+}
+
+// Join Screen Component - shows before joining
+function JoinScreen({
+  meetingId,
+  setMeetingId,
+  onCreateMeeting,
+  onJoinMeeting,
+  isHost,
+}: {
+  meetingId: string;
+  setMeetingId: (id: string) => void;
+  onCreateMeeting: () => void;
+  onJoinMeeting: () => void;
+  isHost: boolean;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center h-[400px] bg-gray-900 rounded-lg p-6">
+      <h2 className="text-xl font-bold text-white mb-6">Video Call</h2>
+      
+      {isHost ? (
+        <div className="text-center">
+          <p className="text-gray-400 mb-4">Create a new meeting room for your session</p>
+          <Button onClick={onCreateMeeting} size="lg">
+            Create Meeting
+          </Button>
+        </div>
+      ) : (
+        <div className="text-center">
+          <p className="text-gray-400 mb-4">Enter the Room ID provided by your therapist</p>
+          <input
+            type="text"
+            placeholder="Enter Room ID"
+            value={meetingId}
+            onChange={(e) => setMeetingId(e.target.value)}
+            className="w-full max-w-xs px-4 py-2 rounded bg-gray-800 text-white border border-gray-700 mb-4"
+          />
+          <Button 
+            onClick={onJoinMeeting} 
+            size="lg"
+            disabled={!meetingId}
+          >
+            Join Meeting
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // Main VideoSDK Call Component
 interface VideoSDKCallProps {
@@ -390,7 +390,7 @@ interface VideoSDKCallProps {
   participantRole: 'patient' | 'therapist';
   onCallEnd: () => void;
   isHost?: boolean;
-  meetingId?: string; // If provided, join existing meeting; otherwise create new
+  meetingId?: string;
 }
 
 const VideoSDKCall: React.FC<VideoSDKCallProps> = ({
@@ -401,57 +401,74 @@ const VideoSDKCall: React.FC<VideoSDKCallProps> = ({
   isHost = false,
   meetingId: existingMeetingId,
 }) => {
-  const [token, setToken] = useState<string | null>(null);
-  const [meetingId, setMeetingId] = useState<string | null>(existingMeetingId || null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [meetingId, setMeetingId] = useState<string>(existingMeetingId || '');
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [isJoined, setIsJoined] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const displayName = participantRole === 'therapist' ? `Dr. ${participantName}` : participantName;
 
+  // Fetch token on mount
   useEffect(() => {
-    const initializeMeeting = async () => {
+    const fetchToken = async () => {
       try {
-        setIsLoading(true);
-        setError(null);
-
-        // Get token
-        const authToken = await getToken();
-        setToken(authToken);
-
-        if (existingMeetingId) {
-          // Validate existing meeting
-          const isValid = await validateMeeting(authToken, existingMeetingId);
-          if (isValid) {
-            setMeetingId(existingMeetingId);
-          } else {
-            throw new Error('Invalid meeting ID');
-          }
-        } else if (isHost) {
-          // Create new meeting if host
-          const newMeetingId = await createMeeting(authToken);
-          setMeetingId(newMeetingId);
-          console.log('Created new meeting:', newMeetingId);
-        } else {
-          throw new Error('Meeting ID required for participants');
-        }
+        const token = await getAuthToken();
+        setAuthToken(token);
       } catch (err) {
-        console.error('Error initializing meeting:', err);
-        setError(err instanceof Error ? err.message : 'Failed to initialize video call');
-      } finally {
-        setIsLoading(false);
+        console.error('Failed to get auth token:', err);
+        setError('Failed to connect to video service. Please make sure the backend server is running.');
       }
     };
+    fetchToken();
+  }, []);
 
-    initializeMeeting();
-  }, [existingMeetingId, isHost]);
+  // Auto-join if meetingId is provided and token is ready
+  useEffect(() => {
+    if (existingMeetingId && authToken) {
+      setMeetingId(existingMeetingId);
+      setIsJoined(true);
+    }
+  }, [existingMeetingId, authToken]);
+
+  const handleCreateMeeting = async () => {
+    if (!authToken) {
+      setError('Video service not ready. Please wait or refresh the page.');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+      const newMeetingId = await createMeeting({ token: authToken });
+      setMeetingId(newMeetingId);
+      setIsJoined(true);
+    } catch (err) {
+      console.error('Failed to create meeting:', err);
+      setError(err instanceof Error ? err.message : 'Failed to create meeting');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleJoinMeeting = () => {
+    if (!authToken) {
+      setError('Video service not ready. Please wait or refresh the page.');
+      return;
+    }
+    if (!meetingId) {
+      setError('Please enter a Room ID');
+      return;
+    }
+    setIsJoined(true);
+  };
 
   if (isLoading) {
     return (
       <div className="fixed inset-0 z-50 bg-black flex items-center justify-center">
         <div className="text-center text-white">
           <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4" />
-          <p className="text-lg">Initializing video call...</p>
-          <p className="text-sm text-gray-400 mt-2">Please wait</p>
+          <p className="text-lg">Creating meeting...</p>
         </div>
       </div>
     );
@@ -464,18 +481,38 @@ const VideoSDKCall: React.FC<VideoSDKCallProps> = ({
           <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
             <PhoneOff className="w-8 h-8 text-red-500" />
           </div>
-          <p className="text-lg mb-2">Failed to start video call</p>
+          <p className="text-lg mb-2">Error</p>
           <p className="text-sm text-gray-400 mb-4">{error}</p>
-          <Button onClick={onCallEnd} variant="outline">
-            Go Back
+          <Button onClick={() => setError(null)} variant="outline">
+            Try Again
           </Button>
         </div>
       </div>
     );
   }
 
-  if (!token || !meetingId) {
-    return null;
+  // Show loading while fetching token
+  if (!authToken) {
+    return (
+      <div className="fixed inset-0 z-50 bg-black flex items-center justify-center">
+        <div className="text-center text-white">
+          <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4" />
+          <p className="text-lg">Connecting to video service...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isJoined) {
+    return (
+      <JoinScreen
+        meetingId={meetingId}
+        setMeetingId={setMeetingId}
+        onCreateMeeting={handleCreateMeeting}
+        onJoinMeeting={handleJoinMeeting}
+        isHost={isHost}
+      />
+    );
   }
 
   return (
@@ -487,18 +524,11 @@ const VideoSDKCall: React.FC<VideoSDKCallProps> = ({
         name: displayName,
         debugMode: false,
       }}
-      token={token}
+      token={authToken}
     >
-      <MeetingView
-        onCallEnd={onCallEnd}
-        participantName={participantName}
-        isHost={isHost}
-      />
+      <MeetingView meetingId={meetingId} onMeetingLeave={onCallEnd} />
     </MeetingProvider>
   );
 };
 
 export default VideoSDKCall;
-
-// Export helper functions for use in other components
-export { getToken, createMeeting, validateMeeting, VIDEOSDK_API_KEY };

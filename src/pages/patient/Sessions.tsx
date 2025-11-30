@@ -10,7 +10,6 @@ import { collection, getDocs, query, where, orderBy, doc, updateDoc, getDoc } fr
 import { Calendar, Clock, Video, FileText, User, Mail, Phone, Star, Award, MapPin, Activity } from 'lucide-react';
 import { format } from 'date-fns';
 import VideoSDKCall from '@/components/VideoSDKCall';
-
 type Session = {
   id: string;
   patientId: string;
