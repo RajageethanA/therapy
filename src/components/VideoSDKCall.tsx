@@ -25,32 +25,39 @@ import * as jose from 'jose';
 // VideoSDK credentials from environment variables
 const VIDEOSDK_API_KEY = import.meta.env.VITE_VIDEOSDK_API_KEY || '';
 const VIDEOSDK_SECRET = import.meta.env.VITE_VIDEOSDK_SECRET || '';
+const VIDEOSDK_TOKEN = import.meta.env.VITE_VIDEOSDK_TOKEN || ''; // Pre-generated token from dashboard
 
 // Generate JWT token for VideoSDK
 const getToken = async (): Promise<string> => {
+  // If a pre-generated token is provided, use it
+  if (VIDEOSDK_TOKEN) {
+    console.log('Using pre-generated VideoSDK token');
+    return VIDEOSDK_TOKEN;
+  }
+
   try {
     if (!VIDEOSDK_API_KEY || !VIDEOSDK_SECRET) {
       console.error('VideoSDK API Key or Secret not configured');
       throw new Error('VideoSDK credentials not configured');
     }
 
-    // Create JWT payload
+    // Create JWT payload - VideoSDK specific format
     const payload = {
       apikey: VIDEOSDK_API_KEY,
       permissions: ['allow_join', 'allow_mod'],
     };
 
-    // Encode secret to Uint8Array
-    const secret = new TextEncoder().encode(VIDEOSDK_SECRET);
+    // Create secret key from the secret string
+    const secretKey = new TextEncoder().encode(VIDEOSDK_SECRET);
 
-    // Generate JWT token using jose
+    // Generate JWT token using jose library with proper options
     const token = await new jose.SignJWT(payload)
       .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
       .setIssuedAt()
-      .setExpirationTime('24h')
-      .sign(secret);
+      .setExpirationTime('2h') // 2 hours expiration
+      .sign(secretKey);
 
-    console.log('Generated VideoSDK token successfully');
+    console.log('Generated VideoSDK token:', token.substring(0, 50) + '...');
     return token;
   } catch (error) {
     console.error('Error generating token:', error);

@@ -371,11 +371,34 @@ export default function Sessions() {
                                     {requestingVideoCall === session.id ? 'Requesting...' : 'Request Video Call'}
                                   </Button>
                                 ) : session.videoCallRequest.status === 'pending' ? (
-                                  // Request pending - show waiting state
-                                  <Button variant="outline" className="flex-1" disabled>
-                                    <Clock className="w-4 h-4 mr-2" />
-                                    Video Call Requested - Awaiting Therapist
-                                  </Button>
+                                  // Request pending - check if 5 minutes have passed
+                                  (() => {
+                                    const requestedAt = session.videoCallRequest.requestedAt?.toDate?.() || new Date(session.videoCallRequest.requestedAt);
+                                    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+                                    const canRequestAgain = requestedAt < fiveMinutesAgo;
+                                    
+                                    return canRequestAgain ? (
+                                      // 5 minutes passed - allow new request
+                                      <Button 
+                                        className="flex-1 bg-blue-600 hover:bg-blue-700"
+                                        disabled={requestingVideoCall === session.id}
+                                        onClick={() => requestVideoCall(
+                                          session.id, 
+                                          session.therapistId, 
+                                          session.therapistName || therapists[session.therapistId]?.name || 'Therapist'
+                                        )}
+                                      >
+                                        <Video className="w-4 h-4 mr-2" />
+                                        {requestingVideoCall === session.id ? 'Requesting...' : 'Request Video Call Again'}
+                                      </Button>
+                                    ) : (
+                                      // Still waiting - show waiting state
+                                      <Button variant="outline" className="flex-1" disabled>
+                                        <Clock className="w-4 h-4 mr-2" />
+                                        Video Call Requested - Awaiting Therapist
+                                      </Button>
+                                    );
+                                  })()
                                 ) : session.videoCallRequest.status === 'accepted' && session.videoCallStatus === 'active' ? (
                                   // Request accepted and call is active - show join button
                                   <Button 
