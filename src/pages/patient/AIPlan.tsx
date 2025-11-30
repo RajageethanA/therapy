@@ -451,41 +451,61 @@ const AIPlan: React.FC = () => {
     setIsGeneratingTasks(true);
     
     try {
-      const response = await generateDailyProgressWithGemini(currentSeverity, currentSadnessScore, completedTasks, timeOfDay);
+      // Try Gemini API first
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
       
-      // Create new AI-recommended tasks
-      const aiTasks = response.tasks.map((task: any, index: number) => ({
-        id: Date.now() + index,
-        title: task.title,
-        description: task.description,
-        category: task.category,
-        duration: task.duration,
-        completed: false,
-        aiRecommended: true,
-        priority: task.priority || (index === 0 ? 'high' : index === 1 ? 'high' : 'medium')
-      }));
+      if (apiKey && apiKey !== 'your_gemini_api_key_here') {
+        try {
+          const response = await generateDailyProgressWithGemini(currentSeverity, currentSadnessScore, completedTasks, timeOfDay);
+          
+          // Create new AI-recommended tasks
+          const aiTasks = response.tasks.map((task: any, index: number) => ({
+            id: Date.now() + index,
+            title: task.title,
+            description: task.description,
+            category: task.category,
+            duration: task.duration,
+            completed: false,
+            aiRecommended: true,
+            priority: task.priority || (index === 0 ? 'high' : index === 1 ? 'high' : 'medium')
+          }));
 
-      setDailyTasks(aiTasks);
-      
-      if (response.insights) {
-        setDailyStats(prev => ({
-          ...prev,
-          aiInsights: response.insights,
-          totalPoints: prev.totalPoints + 10,
-        }));
+          setDailyTasks(aiTasks);
+          
+          if (response.insights) {
+            setDailyStats(prev => ({
+              ...prev,
+              aiInsights: response.insights,
+              totalPoints: prev.totalPoints + 10,
+            }));
+          }
+
+          console.log('✅ Successfully generated new AI tasks:', aiTasks);
+          return; // Exit if successful
+        } catch (apiError) {
+          console.warn('⚠️ Gemini API failed, using fallback tasks:', apiError);
+        }
       }
-
-      console.log('✅ Successfully generated new AI tasks:', aiTasks);
+      
+      // Use fallback tasks if API fails or key not configured
+      throw new Error('Using fallback tasks');
 
     } catch (error) {
-      console.error('❌ Error generating AI tasks:', error);
+      console.log('📋 Using curated wellness tasks based on severity:', currentSeverity);
       
       const timeBasedTasks = getTimeBasedFallbackTasks(timeOfDay, currentSeverity);
       setDailyTasks(timeBasedTasks);
       
+      // Generate appropriate insights based on severity
+      const insights = {
+        minimal: `Great news! Your sadness levels are minimal. Here are some ${timeOfDay} activities to maintain your positive mental state.`,
+        moderate: `We've prepared some helpful ${timeOfDay} coping strategies for you. These activities can help lift your mood.`,
+        severe: `We understand you're going through a difficult time. Here are some gentle, supportive activities for this ${timeOfDay}. Remember, it's okay to take things slow.`
+      };
+      
       setDailyStats(prev => ({
         ...prev,
-        aiInsights: `Here are some ${timeOfDay} wellness activities tailored for your current state.`
+        aiInsights: insights[currentSeverity as keyof typeof insights] || insights.minimal
       }));
 
     } finally {
@@ -494,7 +514,7 @@ const AIPlan: React.FC = () => {
   };
 
   const getTimeBasedFallbackTasks = (timeOfDay: string, severity: string) => {
-    // Tasks tailored to severity level
+    // Tasks tailored to severity level - 5 tasks each for comprehensive support
     const severeTasks = [
       {
         id: Date.now() + 1,
@@ -515,6 +535,36 @@ const AIPlan: React.FC = () => {
         completed: false,
         aiRecommended: true,
         priority: "high" as const
+      },
+      {
+        id: Date.now() + 3,
+        title: "Deep Breathing",
+        description: "Try the 4-7-8 technique: breathe in for 4 seconds, hold for 7, exhale for 8. Repeat 4 times.",
+        category: "Self-Care",
+        duration: "5 min",
+        completed: false,
+        aiRecommended: true,
+        priority: "high" as const
+      },
+      {
+        id: Date.now() + 4,
+        title: "Reach Out for Support",
+        description: "Text or call someone you trust. You don't have to go through this alone.",
+        category: "Social",
+        duration: "10 min",
+        completed: false,
+        aiRecommended: true,
+        priority: "medium" as const
+      },
+      {
+        id: Date.now() + 5,
+        title: "Self-Compassion Break",
+        description: "Place your hand on your heart and say: 'This is hard, but I'm doing my best. I deserve kindness.'",
+        category: "Mental Health",
+        duration: "3 min",
+        completed: false,
+        aiRecommended: true,
+        priority: "medium" as const
       }
     ];
 
@@ -532,12 +582,42 @@ const AIPlan: React.FC = () => {
       {
         id: Date.now() + 2,
         title: "Connect with Someone",
-        description: "Reach out to a friend, family member, or support person",
+        description: "Reach out to a friend, family member, or support person - even a quick text counts",
         category: "Social",
         duration: "10 min",
         completed: false,
         aiRecommended: true,
+        priority: "high" as const
+      },
+      {
+        id: Date.now() + 3,
+        title: "Journaling Session",
+        description: "Write about how you're feeling without judgment. Let your thoughts flow freely.",
+        category: "Mental Health",
+        duration: "10 min",
+        completed: false,
+        aiRecommended: true,
         priority: "medium" as const
+      },
+      {
+        id: Date.now() + 4,
+        title: "Calming Music",
+        description: "Listen to your favorite calming music or nature sounds for relaxation",
+        category: "Self-Care",
+        duration: "15 min",
+        completed: false,
+        aiRecommended: true,
+        priority: "medium" as const
+      },
+      {
+        id: Date.now() + 5,
+        title: "Mindful Breathing",
+        description: "Practice box breathing: 4 seconds in, 4 seconds hold, 4 seconds out, 4 seconds hold",
+        category: "Mindfulness",
+        duration: "5 min",
+        completed: false,
+        aiRecommended: true,
+        priority: "low" as const
       }
     ];
 
@@ -545,7 +625,7 @@ const AIPlan: React.FC = () => {
       {
         id: Date.now() + 1,
         title: "Gratitude Practice",
-        description: "Write down 3 things you're grateful for today",
+        description: "Write down 3 things you're grateful for today - big or small",
         category: "Mental Health",
         duration: "5 min",
         completed: false,
@@ -555,9 +635,39 @@ const AIPlan: React.FC = () => {
       {
         id: Date.now() + 2,
         title: "Mindful Moment",
-        description: "Take 5 minutes to breathe deeply and be present",
+        description: "Take 5 minutes to breathe deeply and be fully present in this moment",
         category: "Mindfulness",
         duration: "5 min",
+        completed: false,
+        aiRecommended: true,
+        priority: "medium" as const
+      },
+      {
+        id: Date.now() + 3,
+        title: "Physical Activity",
+        description: "Do 15 minutes of exercise you enjoy - walking, dancing, yoga, or stretching",
+        category: "Physical",
+        duration: "15 min",
+        completed: false,
+        aiRecommended: true,
+        priority: "medium" as const
+      },
+      {
+        id: Date.now() + 4,
+        title: "Creative Expression",
+        description: "Spend time on a creative hobby - drawing, writing, music, or crafts",
+        category: "Creative",
+        duration: "20 min",
+        completed: false,
+        aiRecommended: true,
+        priority: "low" as const
+      },
+      {
+        id: Date.now() + 5,
+        title: "Kind Act",
+        description: "Do something kind for yourself or someone else today",
+        category: "Social",
+        duration: "10 min",
         completed: false,
         aiRecommended: true,
         priority: "low" as const
