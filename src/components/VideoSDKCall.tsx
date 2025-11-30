@@ -4,6 +4,21 @@ import {
   useMeeting,
   useParticipant,
 } from "@videosdk.live/react-sdk";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Video,
+  VideoOff,
+  Mic,
+  MicOff,
+  PhoneOff,
+  Copy,
+  Users,
+  Maximize2,
+  Minimize2,
+} from "lucide-react";
 
 // Auth token - Generate from https://app.videosdk.live/api-keys
 // Select BOTH "allow_join" AND "allow_mod" permissions
@@ -61,19 +76,7 @@ function ParticipantView({ participantId }: { participantId: string }) {
   }, [webcamStream, webcamOn]);
 
   return (
-    <div
-      style={{
-        border: "1px solid #ccc",
-        borderRadius: "8px",
-        padding: "10px",
-        margin: "10px",
-        backgroundColor: isLocal ? "#f0f9ff" : "#fff",
-      }}
-    >
-      <p style={{ fontWeight: "bold", marginBottom: "8px" }}>
-        {displayName} {isLocal && "(You)"} | Webcam: {webcamOn ? "ON" : "OFF"} |
-        Mic: {micOn ? "ON" : "OFF"}
-      </p>
+    <div className={`relative rounded-xl overflow-hidden ${isLocal ? "w-48 h-36" : "flex-1 min-h-[300px]"}`}>
       <audio ref={micRef} autoPlay muted={isLocal} />
       {webcamOn ? (
         <video
@@ -81,29 +84,37 @@ function ParticipantView({ participantId }: { participantId: string }) {
           autoPlay
           playsInline
           muted={isLocal}
-          style={{
-            width: "300px",
-            height: "200px",
-            backgroundColor: "#000",
-            borderRadius: "4px",
-          }}
+          className="w-full h-full object-cover bg-gray-900"
         />
       ) : (
-        <div
-          style={{
-            width: "300px",
-            height: "200px",
-            backgroundColor: "#333",
-            borderRadius: "4px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "#fff",
-          }}
-        >
-          Camera Off
+        <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
+          <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center">
+            <span className="text-3xl font-bold text-white">
+              {displayName?.charAt(0)?.toUpperCase() || "?"}
+            </span>
+          </div>
         </div>
       )}
+      
+      {/* Name overlay */}
+      <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
+        <div className="bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-lg flex items-center gap-2">
+          <span className="text-white text-sm font-medium">{displayName || "Participant"}</span>
+          {isLocal && <Badge variant="secondary" className="text-xs">You</Badge>}
+        </div>
+        <div className="flex gap-1.5">
+          {!micOn && (
+            <div className="bg-red-500/90 p-1.5 rounded-lg">
+              <MicOff className="w-3.5 h-3.5 text-white" />
+            </div>
+          )}
+          {!webcamOn && (
+            <div className="bg-red-500/90 p-1.5 rounded-lg">
+              <VideoOff className="w-3.5 h-3.5 text-white" />
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -111,47 +122,43 @@ function ParticipantView({ participantId }: { participantId: string }) {
 // Controls Component
 function Controls() {
   const { leave, toggleMic, toggleWebcam } = useMeeting();
+  const [micOn, setMicOn] = useState(true);
+  const [webcamOn, setWebcamOn] = useState(true);
+
   return (
-    <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
-      <button
+    <div className="flex items-center justify-center gap-4">
+      <Button
+        onClick={() => {
+          toggleMic();
+          setMicOn(!micOn);
+        }}
+        size="lg"
+        variant={micOn ? "outline" : "destructive"}
+        className="rounded-full w-14 h-14 p-0"
+      >
+        {micOn ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}
+      </Button>
+
+      <Button
+        onClick={() => {
+          toggleWebcam();
+          setWebcamOn(!webcamOn);
+        }}
+        size="lg"
+        variant={webcamOn ? "outline" : "destructive"}
+        className="rounded-full w-14 h-14 p-0"
+      >
+        {webcamOn ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
+      </Button>
+
+      <Button
         onClick={() => leave()}
-        style={{
-          padding: "10px 20px",
-          backgroundColor: "#ef4444",
-          color: "white",
-          border: "none",
-          borderRadius: "4px",
-          cursor: "pointer",
-        }}
+        size="lg"
+        variant="destructive"
+        className="rounded-full w-14 h-14 p-0 bg-red-600 hover:bg-red-700"
       >
-        Leave
-      </button>
-      <button
-        onClick={() => toggleMic()}
-        style={{
-          padding: "10px 20px",
-          backgroundColor: "#3b82f6",
-          color: "white",
-          border: "none",
-          borderRadius: "4px",
-          cursor: "pointer",
-        }}
-      >
-        Toggle Mic
-      </button>
-      <button
-        onClick={() => toggleWebcam()}
-        style={{
-          padding: "10px 20px",
-          backgroundColor: "#3b82f6",
-          color: "white",
-          border: "none",
-          borderRadius: "4px",
-          cursor: "pointer",
-        }}
-      >
-        Toggle Webcam
-      </button>
+        <PhoneOff className="w-6 h-6" />
+      </Button>
     </div>
   );
 }
@@ -165,9 +172,14 @@ function MeetingView({
   meetingId: string;
 }) {
   const [joined, setJoined] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [callDuration, setCallDuration] = useState(0);
+  const startTimeRef = useRef<number>(Date.now());
+
   const { join, participants } = useMeeting({
     onMeetingJoined: () => {
       setJoined("JOINED");
+      startTimeRef.current = Date.now();
     },
     onMeetingLeft: () => {
       onMeetingLeave();
@@ -179,46 +191,121 @@ function MeetingView({
     join();
   };
 
-  return (
-    <div
-      style={{
-        padding: "20px",
-        backgroundColor: "#f9fafb",
-        minHeight: "400px",
-        borderRadius: "8px",
-      }}
-    >
-      <h3 style={{ marginBottom: "10px" }}>Meeting Id: {meetingId}</h3>
-      {joined && joined === "JOINED" ? (
-        <div>
-          <Controls />
-          <div style={{ display: "flex", flexWrap: "wrap" }}>
-            {[...participants.keys()].map((participantId) => (
-              <ParticipantView
-                participantId={participantId}
-                key={participantId}
-              />
-            ))}
-          </div>
+  // Timer
+  useEffect(() => {
+    if (joined === "JOINED") {
+      const timer = setInterval(() => {
+        setCallDuration(Math.floor((Date.now() - startTimeRef.current) / 1000));
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [joined]);
+
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  const copyMeetingId = () => {
+    navigator.clipboard.writeText(meetingId);
+  };
+
+  const participantIds = [...participants.keys()];
+
+  if (joined === "JOINING") {
+    return (
+      <div className="fixed inset-0 z-50 bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-white text-lg">Joining the meeting...</p>
         </div>
-      ) : joined && joined === "JOINING" ? (
-        <p>Joining the meeting...</p>
-      ) : (
-        <button
-          onClick={joinMeeting}
-          style={{
-            padding: "15px 30px",
-            backgroundColor: "#22c55e",
-            color: "white",
-            border: "none",
-            borderRadius: "4px",
-            cursor: "pointer",
-            fontSize: "16px",
-          }}
-        >
+      </div>
+    );
+  }
+
+  if (!joined) {
+    return (
+      <Card className="p-8 text-center bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700">
+        <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-6">
+          <Video className="w-10 h-10 text-primary" />
+        </div>
+        <h3 className="text-xl font-semibold text-white mb-2">Ready to Join?</h3>
+        <p className="text-gray-400 mb-6">Meeting ID: {meetingId}</p>
+        <Button onClick={joinMeeting} size="lg" className="px-8">
           Join Meeting
-        </button>
-      )}
+        </Button>
+      </Card>
+    );
+  }
+
+  return (
+    <div className={`bg-gray-900 text-white flex flex-col ${isFullscreen ? "fixed inset-0 z-50" : "h-[600px] rounded-xl overflow-hidden"}`}>
+      {/* Header */}
+      <div className="bg-gray-800/80 backdrop-blur-sm px-4 py-3 flex items-center justify-between border-b border-gray-700">
+        <div className="flex items-center gap-4">
+          <Badge className="bg-green-600 hover:bg-green-600">
+            <div className="w-2 h-2 bg-white rounded-full animate-pulse mr-2" />
+            Live
+          </Badge>
+          <div className="flex items-center gap-2 text-gray-300">
+            <Users className="w-4 h-4" />
+            <span className="text-sm">{participantIds.length}</span>
+          </div>
+          <span className="text-sm font-mono text-gray-300 bg-gray-700/50 px-2 py-1 rounded">
+            {formatDuration(callDuration)}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={copyMeetingId}
+            className="text-gray-300 hover:text-white hover:bg-gray-700"
+          >
+            <Copy className="w-4 h-4 mr-2" />
+            <span className="font-mono text-xs">{meetingId}</span>
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsFullscreen(!isFullscreen)}
+            className="text-gray-300 hover:text-white hover:bg-gray-700"
+          >
+            {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+          </Button>
+        </div>
+      </div>
+
+      {/* Video Grid */}
+      <div className="flex-1 p-4 relative flex gap-4">
+        {participantIds.length === 0 ? (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="w-12 h-12 border-4 border-gray-600 border-t-primary rounded-full animate-spin" />
+          </div>
+        ) : participantIds.length === 1 ? (
+          <ParticipantView participantId={participantIds[0]} key={participantIds[0]} />
+        ) : (
+          <>
+            {/* Remote participant (large) */}
+            {participantIds.filter(id => !participants.get(id)?.local).map((participantId) => (
+              <ParticipantView participantId={participantId} key={participantId} />
+            ))}
+            {/* Local participant (small, overlay) */}
+            <div className="absolute bottom-20 right-4">
+              {participantIds.filter(id => participants.get(id)?.local).map((participantId) => (
+                <ParticipantView participantId={participantId} key={participantId} />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Controls */}
+      <div className="bg-gray-800/80 backdrop-blur-sm px-4 py-4 border-t border-gray-700">
+        <Controls />
+      </div>
     </div>
   );
 }
@@ -234,62 +321,39 @@ function JoinScreen({
   const [meetingId, setMeetingId] = useState<string>("");
 
   return (
-    <div
-      style={{
-        padding: "40px",
-        textAlign: "center",
-        backgroundColor: "#f9fafb",
-        borderRadius: "8px",
-      }}
-    >
-      <h2 style={{ marginBottom: "20px" }}>Video Call</h2>
+    <Card className="p-8 text-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 border-gray-200 dark:border-gray-700">
+      <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6">
+        <Video className="w-10 h-10 text-primary" />
+      </div>
+      <h2 className="text-2xl font-bold mb-2">Video Call</h2>
+      <p className="text-muted-foreground mb-6">
+        {isHost ? "Start a new meeting session" : "Enter the meeting ID to join"}
+      </p>
+      
       {isHost ? (
-        <button
-          onClick={() => getMeetingAndToken()}
-          style={{
-            padding: "15px 30px",
-            backgroundColor: "#22c55e",
-            color: "white",
-            border: "none",
-            borderRadius: "4px",
-            cursor: "pointer",
-            fontSize: "16px",
-          }}
-        >
+        <Button onClick={() => getMeetingAndToken()} size="lg" className="px-8">
+          <Video className="w-5 h-5 mr-2" />
           Create Meeting
-        </button>
+        </Button>
       ) : (
-        <div>
-          <input
+        <div className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
+          <Input
             type="text"
-            placeholder="Enter Meeting Id"
+            placeholder="Enter Meeting ID"
             value={meetingId}
             onChange={(e) => setMeetingId(e.target.value)}
-            style={{
-              padding: "10px",
-              width: "250px",
-              marginRight: "10px",
-              border: "1px solid #ccc",
-              borderRadius: "4px",
-            }}
+            className="flex-1"
           />
-          <button
+          <Button
             onClick={() => getMeetingAndToken(meetingId)}
             disabled={!meetingId}
-            style={{
-              padding: "10px 20px",
-              backgroundColor: meetingId ? "#3b82f6" : "#ccc",
-              color: "white",
-              border: "none",
-              borderRadius: "4px",
-              cursor: meetingId ? "pointer" : "not-allowed",
-            }}
+            size="lg"
           >
-            Join
-          </button>
+            Join Meeting
+          </Button>
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -337,13 +401,16 @@ const VideoSDKCall: React.FC<VideoSDKCallProps> = ({
 
   if (!authToken) {
     return (
-      <div style={{ padding: "20px", textAlign: "center", color: "red" }}>
-        <p>VideoSDK token not configured.</p>
-        <p>Add VITE_VIDEOSDK_TOKEN to your .env file.</p>
-        <button onClick={onCallEnd} style={{ marginTop: "10px" }}>
+      <Card className="p-8 text-center">
+        <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+          <VideoOff className="w-8 h-8 text-red-500" />
+        </div>
+        <p className="text-lg font-medium mb-2">VideoSDK token not configured</p>
+        <p className="text-muted-foreground mb-4">Add VITE_VIDEOSDK_TOKEN to your .env file</p>
+        <Button onClick={onCallEnd} variant="outline">
           Go Back
-        </button>
-      </div>
+        </Button>
+      </Card>
     );
   }
 
