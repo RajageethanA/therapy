@@ -293,8 +293,8 @@ def get_therapy_recommendations(sadness_score, severity_level, phq9_score=None, 
         if GEMINI_API_KEY == 'your_gemini_api_key_here' or not GEMINI_API_KEY:
             raise Exception("Gemini API key not configured - cannot generate therapy recommendations")
         
-        # Create the model
-        model = genai.GenerativeModel('gemini-pro')
+        # Create the model - using gemini-1.5-flash (gemini-pro is deprecated)
+        model = genai.GenerativeModel('gemini-1.5-flash')
         
         # Build context
         context_info = ""
