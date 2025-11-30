@@ -18,7 +18,28 @@ import {
   Users,
   Maximize2,
   Minimize2,
+  AlertCircle,
 } from "lucide-react";
+
+// Request media permissions
+const requestMediaPermissions = async (): Promise<{ audio: boolean; video: boolean }> => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+    // Stop tracks after getting permission
+    stream.getTracks().forEach(track => track.stop());
+    return { audio: true, video: true };
+  } catch (error) {
+    console.error("Permission error:", error);
+    // Try audio only
+    try {
+      const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioStream.getTracks().forEach(track => track.stop());
+      return { audio: true, video: false };
+    } catch {
+      return { audio: false, video: false };
+    }
+  }
+};
 
 // Auth token - Generate from https://app.videosdk.live/api-keys
 // Select BOTH "allow_join" AND "allow_mod" permissions
@@ -39,7 +60,7 @@ export const createMeeting = async ({ token }: { token: string }) => {
 };
 
 // Participant View Component
-function ParticipantView({ participantId }: { participantId: string }) {
+function ParticipantView({ participantId, isLarge = false }: { participantId: string; isLarge?: boolean }) {
   const micRef = useRef<HTMLAudioElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const { webcamStream, micStream, webcamOn, micOn, isLocal, displayName } =
@@ -76,7 +97,11 @@ function ParticipantView({ participantId }: { participantId: string }) {
   }, [webcamStream, webcamOn]);
 
   return (
-    <div className={`relative rounded-xl overflow-hidden ${isLocal ? "w-48 h-36" : "flex-1 min-h-[300px]"}`}>
+    <div className={`relative rounded-xl overflow-hidden shadow-lg ${
+      isLarge 
+        ? "w-full h-full min-h-[400px]" 
+        : "w-44 h-32 border-2 border-white/20"
+    }`}>
       <audio ref={micRef} autoPlay muted={isLocal} />
       {webcamOn ? (
         <video
@@ -84,12 +109,12 @@ function ParticipantView({ participantId }: { participantId: string }) {
           autoPlay
           playsInline
           muted={isLocal}
-          className="w-full h-full object-cover bg-gray-900"
+          className={`w-full h-full object-cover bg-gray-900 ${!isLarge && "scale-x-[-1]"}`}
         />
       ) : (
         <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
-          <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center">
-            <span className="text-3xl font-bold text-white">
+          <div className={`rounded-full bg-primary/20 flex items-center justify-center ${isLarge ? "w-24 h-24" : "w-12 h-12"}`}>
+            <span className={`font-bold text-white ${isLarge ? "text-4xl" : "text-xl"}`}>
               {displayName?.charAt(0)?.toUpperCase() || "?"}
             </span>
           </div>
@@ -97,20 +122,22 @@ function ParticipantView({ participantId }: { participantId: string }) {
       )}
       
       {/* Name overlay */}
-      <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
-        <div className="bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-lg flex items-center gap-2">
-          <span className="text-white text-sm font-medium">{displayName || "Participant"}</span>
-          {isLocal && <Badge variant="secondary" className="text-xs">You</Badge>}
+      <div className={`absolute left-2 right-2 flex items-center justify-between ${isLarge ? "bottom-4" : "bottom-2"}`}>
+        <div className={`bg-black/60 backdrop-blur-sm rounded-lg flex items-center gap-2 ${isLarge ? "px-3 py-1.5" : "px-2 py-1"}`}>
+          <span className={`text-white font-medium ${isLarge ? "text-sm" : "text-xs"}`}>
+            {isLarge ? displayName || "Participant" : "You"}
+          </span>
+          {isLocal && isLarge && <Badge variant="secondary" className="text-xs">You</Badge>}
         </div>
-        <div className="flex gap-1.5">
+        <div className="flex gap-1">
           {!micOn && (
-            <div className="bg-red-500/90 p-1.5 rounded-lg">
-              <MicOff className="w-3.5 h-3.5 text-white" />
+            <div className={`bg-red-500/90 rounded-lg ${isLarge ? "p-1.5" : "p-1"}`}>
+              <MicOff className={`text-white ${isLarge ? "w-3.5 h-3.5" : "w-3 h-3"}`} />
             </div>
           )}
           {!webcamOn && (
-            <div className="bg-red-500/90 p-1.5 rounded-lg">
-              <VideoOff className="w-3.5 h-3.5 text-white" />
+            <div className={`bg-red-500/90 rounded-lg ${isLarge ? "p-1.5" : "p-1"}`}>
+              <VideoOff className={`text-white ${isLarge ? "w-3.5 h-3.5" : "w-3 h-3"}`} />
             </div>
           )}
         </div>
@@ -279,23 +306,39 @@ function MeetingView({
       </div>
 
       {/* Video Grid */}
-      <div className="flex-1 p-4 relative flex gap-4">
+      <div className="flex-1 p-4 relative">
         {participantIds.length === 0 ? (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="w-12 h-12 border-4 border-gray-600 border-t-primary rounded-full animate-spin" />
+          <div className="w-full h-full flex items-center justify-center">
+            <div className="text-center">
+              <div className="w-12 h-12 border-4 border-gray-600 border-t-primary rounded-full animate-spin mx-auto mb-4" />
+              <p className="text-gray-400">Connecting...</p>
+            </div>
           </div>
-        ) : participantIds.length === 1 ? (
-          <ParticipantView participantId={participantIds[0]} key={participantIds[0]} />
         ) : (
           <>
-            {/* Remote participant (large) */}
-            {participantIds.filter(id => !participants.get(id)?.local).map((participantId) => (
-              <ParticipantView participantId={participantId} key={participantId} />
-            ))}
-            {/* Local participant (small, overlay) */}
-            <div className="absolute bottom-20 right-4">
+            {/* Remote participant (large/main view) */}
+            <div className="w-full h-full">
+              {participantIds.filter(id => !participants.get(id)?.local).length > 0 ? (
+                participantIds.filter(id => !participants.get(id)?.local).map((participantId) => (
+                  <ParticipantView participantId={participantId} key={participantId} isLarge={true} />
+                ))
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="w-20 h-20 rounded-full bg-gray-700 flex items-center justify-center mx-auto mb-4">
+                      <Users className="w-10 h-10 text-gray-500" />
+                    </div>
+                    <p className="text-gray-400 text-lg">Waiting for other participant...</p>
+                    <p className="text-gray-500 text-sm mt-2">Share the meeting ID to invite them</p>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* Local participant (small, picture-in-picture) */}
+            <div className="absolute bottom-6 right-6 z-10">
               {participantIds.filter(id => participants.get(id)?.local).map((participantId) => (
-                <ParticipantView participantId={participantId} key={participantId} />
+                <ParticipantView participantId={participantId} key={participantId} isLarge={false} />
               ))}
             </div>
           </>
@@ -377,9 +420,25 @@ const VideoSDKCall: React.FC<VideoSDKCallProps> = ({
   const [meetingId, setMeetingId] = useState<string | null>(
     existingMeetingId || null
   );
+  const [permissionStatus, setPermissionStatus] = useState<"checking" | "granted" | "denied">("checking");
+  const [permissionDetails, setPermissionDetails] = useState({ audio: false, video: false });
 
   const displayName =
     participantRole === "therapist" ? `Dr. ${participantName}` : participantName;
+
+  // Check permissions on mount
+  useEffect(() => {
+    const checkPermissions = async () => {
+      const permissions = await requestMediaPermissions();
+      setPermissionDetails(permissions);
+      if (permissions.audio || permissions.video) {
+        setPermissionStatus("granted");
+      } else {
+        setPermissionStatus("denied");
+      }
+    };
+    checkPermissions();
+  }, []);
 
   const getMeetingAndToken = async (id?: string) => {
     const newMeetingId =
@@ -410,6 +469,40 @@ const VideoSDKCall: React.FC<VideoSDKCallProps> = ({
         <Button onClick={onCallEnd} variant="outline">
           Go Back
         </Button>
+      </Card>
+    );
+  }
+
+  // Permission checking state
+  if (permissionStatus === "checking") {
+    return (
+      <Card className="p-8 text-center">
+        <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+        <p className="text-lg font-medium">Requesting camera & microphone access...</p>
+        <p className="text-muted-foreground mt-2">Please allow access when prompted</p>
+      </Card>
+    );
+  }
+
+  // Permission denied state
+  if (permissionStatus === "denied") {
+    return (
+      <Card className="p-8 text-center">
+        <div className="w-16 h-16 rounded-full bg-yellow-100 flex items-center justify-center mx-auto mb-4">
+          <AlertCircle className="w-8 h-8 text-yellow-600" />
+        </div>
+        <p className="text-lg font-medium mb-2">Camera & Microphone Access Required</p>
+        <p className="text-muted-foreground mb-4">
+          Please allow camera and microphone access in your browser settings to join the video call.
+        </p>
+        <div className="flex gap-3 justify-center">
+          <Button onClick={() => window.location.reload()} variant="outline">
+            Try Again
+          </Button>
+          <Button onClick={onCallEnd} variant="ghost">
+            Go Back
+          </Button>
+        </div>
       </Card>
     );
   }
