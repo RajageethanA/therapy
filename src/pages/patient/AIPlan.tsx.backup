@@ -1,0 +1,834 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import {
+  Brain,
+  Camera,
+  Scan,
+  Heart,
+  Smile,
+  Frown,
+  Meh,
+  Angry,
+  CheckCircle2,
+  Loader2,
+  Sparkles,
+  Trophy,
+  Star,
+  Target,
+  Gift,
+  Clock,
+  Shield,
+  RefreshCw,
+  TrendingUp,
+  Check,
+  Checkbox
+} from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+
+// Types for our AI-powered system
+interface EmotionResult {
+  emotion: 'disgusted' | 'angry' | 'fearful' | 'happy' | 'neutral' | 'sad' | 'surprised';
+  confidence: number;
+  timestamp: string;
+}
+
+interface AIRecommendation {
+  title: string;
+  description: string;
+  category: string;
+  priority: 'high' | 'medium' | 'low';
+  icon: string;
+  timeToComplete: string;
+}
+
+interface Task {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  duration: string;
+  day: number;
+  completed: boolean;
+}
+
+export default function AIPlan() {
+  // Camera and emotion detection states
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [showCamera, setShowCamera] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [emotionResult, setEmotionResult] = useState<EmotionResult | null>(null);
+
+  // AI recommendation states
+  const [aiRecommendations, setAiRecommendations] = useState<AIRecommendation[]>([]);
+  const [isGeneratingRecommendations, setIsGeneratingRecommendations] = useState(false);
+
+  // Mock data for the original plan
+  const [tasks, setTasks] = useState<Task[]>([
+    // Day 1
+    { id: '1', title: 'Morning Meditation', description: 'Start your day with 10 minutes of mindfulness', category: 'Mindfulness', duration: '10 min', day: 1, completed: false },
+    { id: '2', title: 'Gratitude Journaling', description: 'Write down 3 things you are grateful for', category: 'Reflection', duration: '5 min', day: 1, completed: false },
+    { id: '3', title: 'Deep Breathing Exercise', description: 'Practice 4-7-8 breathing technique', category: 'Breathing', duration: '5 min', day: 1, completed: false },
+    
+    // Day 2
+    { id: '4', title: 'Nature Walk', description: 'Take a 20-minute walk in nature', category: 'Physical', duration: '20 min', day: 2, completed: false },
+    { id: '5', title: 'Self-Compassion Practice', description: 'Practice loving-kindness meditation', category: 'Mindfulness', duration: '15 min', day: 2, completed: false },
+    { id: '6', title: 'Digital Detox Hour', description: 'Disconnect from devices for one hour', category: 'Wellness', duration: '60 min', day: 2, completed: false },
+    
+    // Day 3
+    { id: '7', title: 'Progressive Muscle Relaxation', description: 'Release tension from your body', category: 'Relaxation', duration: '15 min', day: 3, completed: false },
+    { id: '8', title: 'Creative Expression', description: 'Draw, write, or create something meaningful', category: 'Creativity', duration: '30 min', day: 3, completed: false },
+    { id: '9', title: 'Connection Call', description: 'Reach out to a friend or family member', category: 'Social', duration: '20 min', day: 3, completed: false },
+    
+    // Day 4
+    { id: '10', title: 'Mindful Eating', description: 'Eat one meal without distractions', category: 'Mindfulness', duration: '30 min', day: 4, completed: false },
+    { id: '11', title: 'Positive Affirmations', description: 'Repeat empowering statements to yourself', category: 'Mental Health', duration: '10 min', day: 4, completed: false },
+    { id: '12', title: 'Gentle Yoga', description: 'Practice restorative yoga poses', category: 'Physical', duration: '25 min', day: 4, completed: false },
+    
+    // Day 5
+    { id: '13', title: 'Visualization Exercise', description: 'Imagine your ideal peaceful place', category: 'Mental Health', duration: '15 min', day: 5, completed: false },
+    { id: '14', title: 'Acts of Kindness', description: 'Do something nice for someone else', category: 'Social', duration: '20 min', day: 5, completed: false },
+    { id: '15', title: 'Evening Reflection', description: 'Reflect on your day and emotions', category: 'Reflection', duration: '10 min', day: 5, completed: false },
+    
+    // Day 6
+    { id: '16', title: 'Music Therapy', description: 'Listen to calming or uplifting music', category: 'Wellness', duration: '20 min', day: 6, completed: false },
+    { id: '17', title: 'Boundary Setting', description: 'Practice saying no to one thing today', category: 'Mental Health', duration: '5 min', day: 6, completed: false },
+    { id: '18', title: 'Aromatherapy Session', description: 'Use essential oils or scented candles', category: 'Relaxation', duration: '15 min', day: 6, completed: false },
+    
+    // Day 7
+    { id: '19', title: 'Weekly Review', description: 'Reflect on your progress this week', category: 'Reflection', duration: '20 min', day: 7, completed: false },
+    { id: '20', title: 'Future Planning', description: 'Set intentions for the upcoming week', category: 'Planning', duration: '15 min', day: 7, completed: false },
+    { id: '21', title: 'Celebration Ritual', description: 'Celebrate your efforts and growth', category: 'Wellness', duration: '10 min', day: 7, completed: false },
+  ]);
+
+  const completedCount = tasks.filter(task => task.completed).length;
+  const progressPercentage = (completedCount / tasks.length) * 100;
+
+  const toggleTask = (taskId: string) => {
+    setTasks(tasks.map(task =>
+      task.id === taskId ? { ...task, completed: !task.completed } : task
+    ));
+  };
+
+  const groupedByDay = tasks.reduce((acc, task) => {
+    if (!acc[task.day]) acc[task.day] = [];
+    acc[task.day].push(task);
+    return acc;
+  }, {} as Record<number, typeof tasks>);
+
+  // Camera functions
+  const startCamera = async () => {
+    try {
+      console.log('Starting camera...');
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 640, height: 480 }
+      });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        setShowCamera(true);
+      }
+    } catch (error) {
+      console.error('Error accessing camera:', error);
+      alert('Camera access denied. Please enable camera permissions.');
+    }
+  };
+
+  const stopCamera = () => {
+    if (videoRef.current?.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+    }
+    setShowCamera(false);
+  };
+
+  const detectEmotion = async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    setIsScanning(true);
+    try {
+      // Capture image from video
+      const canvas = canvasRef.current;
+      const video = videoRef.current;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(video, 0, 0);
+        
+        // Simulate emotion detection
+        const mockResult = await simulateEmotionDetection();
+        setEmotionResult(mockResult);
+
+        // Generate recommendations based on emotion
+        setIsGeneratingRecommendations(true);
+        const recommendations = generateMockRecommendations(mockResult.emotion);
+        
+        // Simulate API delay
+        setTimeout(() => {
+          setAiRecommendations(recommendations);
+          setIsGeneratingRecommendations(false);
+        }, 1500);
+        
+        stopCamera();
+      }
+    } catch (error) {
+      console.error('Error detecting emotion:', error);
+      alert('Failed to analyze emotion. Please try again.');
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  // Simulate ML model
+  const simulateEmotionDetection = async (): Promise<EmotionResult> => {
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    const emotions: EmotionResult['emotion'][] = ['disgusted', 'angry', 'fearful', 'happy', 'neutral', 'sad', 'surprised'];
+    const randomEmotion = emotions[Math.floor(Math.random() * emotions.length)];
+    
+    return {
+      emotion: randomEmotion,
+      confidence: Math.random() * 0.3 + 0.7,
+      timestamp: new Date().toISOString()
+    };
+  };
+
+  // Generate mock recommendations
+  const generateMockRecommendations = (emotion: string): AIRecommendation[] => {
+    const recommendationMap: Record<string, AIRecommendation[]> = {
+      happy: [
+        { title: 'Maintain Your Joy', description: 'Share your happiness with others through acts of kindness', category: 'Social', priority: 'medium', icon: '😊', timeToComplete: '10-15 minutes' },
+        { title: 'Gratitude Practice', description: 'Write down what made you feel happy today', category: 'Reflection', priority: 'low', icon: '🙏', timeToComplete: '5 minutes' },
+        { title: 'Energy Boost Activity', description: 'Channel your positive energy into a fun physical activity', category: 'Physical', priority: 'medium', icon: '⚡', timeToComplete: '20-30 minutes' },
+      ],
+      sad: [
+        { title: 'Gentle Self-Care', description: 'Take a warm bath or shower to comfort yourself', category: 'Self-Care', priority: 'high', icon: '🛁', timeToComplete: '15-20 minutes' },
+        { title: 'Reach Out for Support', description: 'Call a trusted friend or family member', category: 'Support', priority: 'high', icon: '📞', timeToComplete: '10-20 minutes' },
+        { title: 'Mindful Breathing', description: 'Practice deep breathing to calm your nervous system', category: 'Mindfulness', priority: 'high', icon: '🌬️', timeToComplete: '5-10 minutes' },
+        { title: 'Journal Your Feelings', description: 'Write about what you are experiencing without judgment', category: 'Expression', priority: 'medium', icon: '📝', timeToComplete: '15 minutes' },
+      ],
+      angry: [
+        { title: 'Physical Release', description: 'Go for a brisk walk or do jumping jacks to release tension', category: 'Physical', priority: 'high', icon: '🏃', timeToComplete: '10-15 minutes' },
+        { title: 'Progressive Muscle Relaxation', description: 'Tense and release muscle groups to reduce anger', category: 'Relaxation', priority: 'high', icon: '💪', timeToComplete: '10 minutes' },
+        { title: 'Cooling Visualization', description: 'Imagine a peaceful, cool place to calm your mind', category: 'Mindfulness', priority: 'medium', icon: '🧊', timeToComplete: '5-10 minutes' },
+      ],
+      fearful: [
+        { title: 'Grounding Exercise', description: 'Use the 5-4-3-2-1 technique to connect with the present', category: 'Grounding', priority: 'high', icon: '🌍', timeToComplete: '5 minutes' },
+        { title: 'Safe Space Visualization', description: 'Imagine yourself in your safest, most comfortable place', category: 'Mindfulness', priority: 'high', icon: '🏠', timeToComplete: '10 minutes' },
+        { title: 'Gentle Movement', description: 'Do slow, gentle stretches to release fear from your body', category: 'Movement', priority: 'medium', icon: '🤸', timeToComplete: '10-15 minutes' },
+      ],
+      neutral: [
+        { title: 'Mindful Awareness', description: 'Take a moment to appreciate this balanced state', category: 'Mindfulness', priority: 'low', icon: '🧘', timeToComplete: '5 minutes' },
+        { title: 'Goal Setting', description: 'Use this calm energy to set intentions for your day', category: 'Planning', priority: 'medium', icon: '🎯', timeToComplete: '10 minutes' },
+        { title: 'Creative Expression', description: 'Try a creative activity like drawing or writing', category: 'Creativity', priority: 'low', icon: '🎨', timeToComplete: '20-30 minutes' },
+      ],
+      surprised: [
+        { title: 'Process the Surprise', description: 'Take a moment to understand what surprised you', category: 'Reflection', priority: 'medium', icon: '🤔', timeToComplete: '5 minutes' },
+        { title: 'Share Your Experience', description: 'Talk about the surprising moment with someone', category: 'Social', priority: 'low', icon: '💬', timeToComplete: '10-15 minutes' },
+      ],
+      disgusted: [
+        { title: 'Cleansing Ritual', description: 'Wash your hands and face mindfully to feel refreshed', category: 'Self-Care', priority: 'high', icon: '🧼', timeToComplete: '5 minutes' },
+        { title: 'Distance from Trigger', description: 'Remove yourself from whatever is causing disgust', category: 'Environmental', priority: 'high', icon: '🚪', timeToComplete: 'Immediate' },
+        { title: 'Pleasant Aromatherapy', description: 'Use a pleasant scent to reset your sensory experience', category: 'Aromatherapy', priority: 'medium', icon: '🌸', timeToComplete: '10 minutes' },
+      ]
+    };
+
+    return recommendationMap[emotion] || recommendationMap['neutral'];
+  };
+
+  // Categorize mood based on emotion
+  const categorizeMood = (emotion: string): 'depressed' | 'normal' => {
+    const depressedEmotions = ['sad', 'angry', 'fearful', 'disgusted'];
+    return depressedEmotions.includes(emotion) ? 'depressed' : 'normal';
+  };
+
+  // Get emotion display properties
+  const getEmotionDisplay = (emotion: string) => {
+    switch (emotion) {
+      case 'happy':
+        return { icon: <Smile className="w-6 h-6" />, color: 'text-green-500', bg: 'bg-green-500/10' };
+      case 'sad':
+        return { icon: <Frown className="w-6 h-6" />, color: 'text-blue-500', bg: 'bg-blue-500/10' };
+      case 'angry':
+        return { icon: <Angry className="w-6 h-6" />, color: 'text-red-500', bg: 'bg-red-500/10' };
+      case 'fearful':
+        return { icon: <Heart className="w-6 h-6" />, color: 'text-purple-500', bg: 'bg-purple-500/10' };
+      case 'disgusted':
+        return { icon: <Frown className="w-6 h-6" />, color: 'text-orange-500', bg: 'bg-orange-500/10' };
+      case 'surprised':
+        return { icon: <Smile className="w-6 h-6" />, color: 'text-yellow-500', bg: 'bg-yellow-500/10' };
+      default:
+        return { icon: <Meh className="w-6 h-6" />, color: 'text-gray-500', bg: 'bg-gray-500/10' };
+    }
+  };
+
+  return (
+    <div className="space-y-8 max-w-4xl mx-auto">
+      <div className="text-center">
+        <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full mb-4">
+          <Brain className="w-5 h-5" />
+          <span className="font-medium">AI-Powered Wellness Journey</span>
+        </div>
+        <h1 className="text-4xl font-bold mb-2">Your Personalized Daily Plan</h1>
+        <p className="text-muted-foreground text-lg">
+          {dailyPlan?.theme || 'Building healthier habits, one day at a time'}
+        </p>
+      </div>
+
+      {/* User Progress Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="glass-card">
+          <CardContent className="pt-6 text-center">
+            <Trophy className="w-8 h-8 text-yellow-500 mx-auto mb-2" />
+            <div className="text-2xl font-bold text-yellow-500">{userProgress.currentStreak}</div>
+            <div className="text-sm text-muted-foreground">Day Streak</div>
+          </CardContent>
+        </Card>
+        <Card className="glass-card">
+          <CardContent className="pt-6 text-center">
+            <Star className="w-8 h-8 text-purple-500 mx-auto mb-2" />
+            <div className="text-2xl font-bold text-purple-500">{userProgress.totalPoints}</div>
+            <div className="text-sm text-muted-foreground">Total Points</div>
+          </CardContent>
+        </Card>
+        <Card className="glass-card">
+          <CardContent className="pt-6 text-center">
+            <Target className="w-8 h-8 text-blue-500 mx-auto mb-2" />
+            <div className="text-2xl font-bold text-blue-500">{completedCount}/{totalTasks}</div>
+            <div className="text-sm text-muted-foreground">Today's Tasks</div>
+          </CardContent>
+        </Card>
+        <Card className="glass-card">
+          <CardContent className="pt-6 text-center">
+            <Gift className="w-8 h-8 text-green-500 mx-auto mb-2" />
+            <div className="text-2xl font-bold text-green-500">{totalPointsToday}</div>
+            <div className="text-sm text-muted-foreground">Points Today</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Daily Progress */}
+      <Card className="glass-card border-primary/20">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span>Today's Progress</span>
+            <span className="text-2xl font-bold text-primary">{Math.round(progressPercentage)}%</span>
+          </CardTitle>
+          <CardDescription>
+            {dailyPlan?.motivationalMessage || 'Every small step counts towards your wellbeing!'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Progress value={progressPercentage} className="h-3 mb-4" />
+          <div className="flex justify-between text-sm text-muted-foreground">
+            <span>{completedCount} completed</span>
+            <span>{totalTasks - completedCount} remaining</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Emotion Detection Section */}
+      <Card className="glass-card border-purple-500/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Scan className="w-5 h-5 text-purple-500" />
+            AI Emotion Analysis
+          </CardTitle>
+          <CardDescription>
+            Let AI analyze your current emotional state to provide personalized recommendations
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Debug States - More Visible */}
+          <div className="bg-yellow-100 border-2 border-yellow-400 p-3 rounded-lg text-sm">
+            <div><strong>🐛 Debug Info:</strong></div>
+            <div>showCamera: {showCamera.toString()}</div>
+            <div>emotionResult: {emotionResult ? JSON.stringify(emotionResult) : 'null'}</div>
+            <div>isGeneratingRecommendations: {isGeneratingRecommendations.toString()}</div>
+            <div>aiRecommendations: {aiRecommendations.length} items</div>
+            <div>cameraReady: {cameraReady.toString()}</div>
+          </div>
+          
+          {!showCamera && !emotionResult && (
+            <div className="text-center space-y-4">
+              <div className="w-32 h-32 mx-auto bg-purple-500/10 rounded-full flex items-center justify-center">
+                <Camera className="w-12 h-12 text-purple-500" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Discover How You're Feeling</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Our AI will analyze your facial expression to understand your emotional state and provide personalized wellness recommendations.
+                </p>
+                <Button 
+                  onClick={() => {
+                    console.log('Start Emotion Scan button clicked');
+                    startCamera();
+                  }} 
+                  className="bg-purple-600 hover:bg-purple-700"
+                >
+                  <Camera className="w-4 h-4 mr-2" />
+                  Start Emotion Scan
+                </Button>
+                
+                {/* Test Button - Remove in production */}
+                <Button 
+                  onClick={async () => {
+                    console.log('Test emotion analysis without camera');
+                    const testResult = {
+                      emotion: 'happy' as const,
+                      confidence: 0.85,
+                      timestamp: new Date().toISOString()
+                    };
+                    setEmotionResult(testResult);
+                    setIsGeneratingRecommendations(true);
+                    
+                    try {
+                      const recommendations = await generateAIRecommendations(testResult);
+                      setAiRecommendations(recommendations);
+                    } catch (error) {
+                      console.error('Test recommendations failed:', error);
+                      setAiRecommendations([]);
+                    } finally {
+                      setIsGeneratingRecommendations(false);
+                    }
+                  }} 
+                  variant="outline"
+                  className="bg-green-100 hover:bg-green-200"
+                >
+                  🧪 Test Emotion Analysis
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {showCamera && !emotionResult && (
+            <div className="space-y-4">
+              <div className="relative">
+                <video
+                  ref={videoRef}
+                  className="w-full max-w-md mx-auto rounded-lg border"
+                  autoPlay
+                  playsInline
+                  muted
+                  onLoadedMetadata={() => {
+                    console.log('Video metadata loaded and ready');
+                  }}
+                />
+                <canvas ref={canvasRef} className="hidden" />
+                
+                {/* Video Status Indicator */}
+                <div className="absolute top-2 right-2">
+                  <div className={`w-3 h-3 rounded-full ${cameraReady ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'}`}></div>
+                </div>
+                
+                {/* Instructions */}
+                <div className="absolute bottom-2 left-2 right-2">
+                  <div className="bg-black/50 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">
+                    {cameraReady ? 'Position your face in the frame and click "Analyze Emotion"' : 'Loading camera...'}
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-2 justify-center">
+                <Button
+                  onClick={detectEmotion}
+                  disabled={isScanning || !cameraReady}
+                  className="bg-green-600 hover:bg-green-700 disabled:opacity-50"
+                >
+                  {isScanning ? (
+                    <>
+                      <Scan className="w-4 h-4 mr-2 animate-spin" />
+                      Analyzing...
+                    </>
+                  ) : !cameraReady ? (
+                    <>
+                      <Camera className="w-4 h-4 mr-2" />
+                      Camera Loading...
+                    </>
+                  ) : (
+                    <>
+                      <Scan className="w-4 h-4 mr-2" />
+                      Analyze Emotion
+                    </>
+                  )}
+                </Button>
+                <Button onClick={stopCamera} variant="outline">
+                  Cancel
+                </Button>
+              </div>
+              
+              {/* Debug Info (remove in production) */}
+              <div className="text-xs text-muted-foreground text-center space-y-1">
+                <div>Camera Status: {cameraReady ? '✅ Ready' : '⏳ Loading...'}</div>
+                <div>Make sure to allow camera permissions if prompted.</div>
+              </div>
+            </div>
+          )}
+
+          {showCamera && emotionResult && (
+            <div className="space-y-4">
+              <div className="text-center space-y-3">
+                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <h3 className="text-lg font-semibold text-green-800 mb-2">Analysis Complete!</h3>
+                  <p className="text-sm text-green-600">
+                    Your emotion has been analyzed. You can scan again for a new analysis or close the camera.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2 justify-center">
+                <Button
+                  onClick={() => {
+                    setEmotionResult(null);
+                    setAiRecommendations([]);
+                    setIsGeneratingRecommendations(false);
+                  }}
+                  className="bg-purple-600 hover:bg-purple-700"
+                >
+                  <Scan className="w-4 h-4 mr-2" />
+                  Scan Again
+                </Button>
+                <Button 
+                  onClick={() => {
+                    stopCamera();
+                  }}
+                  variant="outline"
+                >
+                  Close Camera
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {emotionResult && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-4"
+            >
+              {/* Emotion Result */}
+              <div className="text-center space-y-3">
+                <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center ${getEmotionDisplay(emotionResult.emotion).bg}`}>
+                  <span className={`text-2xl ${getEmotionDisplay(emotionResult.emotion).color}`}>
+                    {getEmotionDisplay(emotionResult.emotion).icon}
+                  </span>
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold capitalize">{emotionResult.emotion}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Confidence: {Math.round(emotionResult.confidence * 100)}%
+                  </p>
+                  <Badge variant="outline" className="mt-2">
+                    Mood: {categorizeMood(emotionResult.emotion) === 'depressed' ? 'Needs Support' : 'Good State'}
+                  </Badge>
+                </div>
+              </div>
+
+              {/* AI Recommendations */}
+              {(aiRecommendations.length > 0 || isGeneratingRecommendations) && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Brain className="w-5 h-5 text-blue-500" />
+                    <h4 className="font-semibold">
+                      {isGeneratingRecommendations ? 'Generating Personalized Recommendations...' : 'AI Recommendations for You'}
+                    </h4>
+                  </div>
+                  
+                  {isGeneratingRecommendations ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-center p-8 bg-muted/30 rounded-lg border">
+                        <div className="text-center space-y-3">
+                          <Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto" />
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium">Gemini AI is analyzing your emotional state...</p>
+                            <p className="text-xs text-muted-foreground">
+                              Creating personalized wellness recommendations just for you
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid gap-3">
+                      {aiRecommendations.map((recommendation, index) => (
+                        <motion.div
+                          key={index}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.1 }}
+                          className="flex items-start gap-3 p-4 bg-muted/30 rounded-lg border hover:bg-muted/40 transition-colors"
+                        >
+                          <span className="text-2xl">{recommendation.icon}</span>
+                          <div className="flex-1 space-y-2">
+                            <div className="flex items-start justify-between">
+                              <h5 className="font-medium">{recommendation.title}</h5>
+                              <div className="flex gap-1">
+                                <Badge 
+                                  variant={recommendation.priority === 'high' ? 'destructive' : 
+                                          recommendation.priority === 'medium' ? 'default' : 'secondary'} 
+                                  className="text-xs"
+                                >
+                                  {recommendation.priority}
+                                </Badge>
+                              </div>
+                            </div>
+                            <p className="text-sm text-muted-foreground">{recommendation.description}</p>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-xs">
+                                {recommendation.category}
+                              </Badge>
+                              <Badge variant="outline" className="text-xs">
+                                ⏱️ {recommendation.timeToComplete}
+                              </Badge>
+                            </div>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {!isGeneratingRecommendations && aiRecommendations.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Sparkles className="w-3 h-3" />
+                        <span>Powered by Google Gemini AI</span>
+                      </div>
+                      <Button
+                        onClick={() => {
+                          setEmotionResult(null);
+                          setAiRecommendations([]);
+                          stopCamera();
+                        }}
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                      >
+                        <Camera className="w-4 h-4 mr-2" />
+                        Start New Emotion Scan
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </motion.div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* AI-Generated Daily Tasks */}
+      {dailyPlan && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-6"
+        >
+          <Card className="glass-card border-green-500/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-green-500" />
+                Today's AI-Generated Tasks
+              </CardTitle>
+              <CardDescription>
+                Personalized activities designed just for you by Gemini AI
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {isGeneratingTasks ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-center p-8 bg-muted/30 rounded-lg border">
+                    <div className="text-center space-y-3">
+                      <Loader2 className="w-8 h-8 animate-spin text-green-500 mx-auto" />
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium">Gemini AI is creating your daily plan...</p>
+                        <p className="text-xs text-muted-foreground">
+                          Generating personalized tasks based on your emotional state and progress
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {dailyPlan.tasks.map((task) => {
+                    const isCompleted = userProgress.completedTasks.includes(task.id);
+                    
+                    return (
+                      <motion.div
+                        key={task.id}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className={`p-4 rounded-lg border transition-all hover:shadow-md ${
+                          isCompleted 
+                            ? 'bg-green-50/50 border-green-200' 
+                            : 'bg-background border-border hover:border-primary/20'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => toggleTask(task.id)}
+                            className={`mt-1 w-6 h-6 rounded-full border-2 ${
+                              isCompleted
+                                ? 'bg-green-500 border-green-500 text-white hover:bg-green-600'
+                                : 'border-muted-foreground/30 hover:border-primary'
+                            }`}
+                          >
+                            {isCompleted && <Check className="w-3 h-3" />}
+                          </Button>
+                          
+                          <div className="flex-1 space-y-2">
+                            <div className="flex items-start justify-between">
+                              <div className="space-y-1">
+                                <h4 className={`font-medium ${isCompleted ? 'line-through text-muted-foreground' : ''}`}>
+                                  {task.title}
+                                </h4>
+                                <p className={`text-sm ${isCompleted ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
+                                  {task.description}
+                                </p>
+                              </div>
+                              <div className="flex gap-2">
+                                <Badge variant="outline" className="text-xs">
+                                  {task.category}
+                                </Badge>
+                                <Badge variant="outline" className="text-xs">
+                                  +{task.points} pts
+                                </Badge>
+                                <Badge 
+                                  variant={task.difficulty === 'easy' ? 'secondary' : 
+                                          task.difficulty === 'medium' ? 'default' : 'destructive'} 
+                                  className="text-xs"
+                                >
+                                  {task.difficulty === 'challenging' ? 'hard' : task.difficulty}
+                                </Badge>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                {task.estimatedTime}
+                              </span>
+                              {task.evidenceBased && (
+                                <span className="flex items-center gap-1">
+                                  <Shield className="w-3 h-3" />
+                                  Evidence-based
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              )}
+              
+              {!isGeneratingTasks && dailyPlan && (
+                <div className="pt-4 border-t space-y-3">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Brain className="w-3 h-3" />
+                    <span>Plan generated by Google Gemini AI based on current emotional state and progress</span>
+                  </div>
+                  <Button
+                    onClick={generateNewDailyPlan}
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    disabled={isGeneratingTasks}
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Generate New Daily Plan
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Progress Insights */}
+          {progressInsights && (
+            <Card className="glass-card border-blue-500/20">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-blue-500" />
+                  AI Progress Insights
+                </CardTitle>
+                <CardDescription>
+                  Personalized analysis of your wellness journey
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-4">
+                  <div>
+                    <h4 className="font-medium text-green-600 mb-2">🎯 Key Insights</h4>
+                    <div className="text-sm text-muted-foreground space-y-1">
+                      {progressInsights.insights.map((insight, index) => (
+                        <p key={index}>{insight}</p>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-medium text-blue-600 mb-2">� Personalized Recommendations</h4>
+                    <div className="text-sm text-muted-foreground space-y-1">
+                      {progressInsights.recommendations.map((rec, index) => (
+                        <p key={index}>{rec}</p>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-medium text-purple-600 mb-2">🎉 Celebration</h4>
+                    <p className="text-sm text-muted-foreground">{progressInsights.celebration}</p>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-medium text-orange-600 mb-2">🎯 Next Goals</h4>
+                    <div className="text-sm text-muted-foreground space-y-1">
+                      {progressInsights.nextGoals.map((goal, index) => (
+                        <p key={index}>{goal}</p>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="pt-4 border-t">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Sparkles className="w-3 h-3" />
+                    <span>Insights powered by Google Gemini AI</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </motion.div>
+      )}
+
+      {/* Generate Daily Plan Button */}
+      {!dailyPlan && !isGeneratingTasks && (
+        <Card className="glass-card text-center">
+          <CardContent className="pt-6">
+            <div className="space-y-4">
+              <div className="w-20 h-20 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
+                <Brain className="w-8 h-8 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold mb-2">Ready for Your AI-Powered Day?</h3>
+                <p className="text-muted-foreground mb-4">
+                  Let Gemini AI create a personalized wellness plan tailored to your current emotional state and progress.
+                </p>
+                <Button onClick={generateNewDailyPlan} size="lg" className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700">
+                  <Sparkles className="w-5 h-5 mr-2" />
+                  Generate My Daily Plan
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
