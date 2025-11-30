@@ -20,15 +20,42 @@ import {
   Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import * as jose from 'jose';
 
-// VideoSDK API Key
-const VIDEOSDK_API_KEY = 'dd3303b9-5f8d-4405-a6db-72c5b0862c0a';
+// VideoSDK credentials from environment variables
+const VIDEOSDK_API_KEY = import.meta.env.VITE_VIDEOSDK_API_KEY || '';
+const VIDEOSDK_SECRET = import.meta.env.VITE_VIDEOSDK_SECRET || '';
 
-// Token generation - In production, generate this from your backend
+// Generate JWT token for VideoSDK
 const getToken = async (): Promise<string> => {
-  // For development, we'll use the API key directly
-  // In production, call your backend to generate a JWT token
-  return VIDEOSDK_API_KEY;
+  try {
+    if (!VIDEOSDK_API_KEY || !VIDEOSDK_SECRET) {
+      console.error('VideoSDK API Key or Secret not configured');
+      throw new Error('VideoSDK credentials not configured');
+    }
+
+    // Create JWT payload
+    const payload = {
+      apikey: VIDEOSDK_API_KEY,
+      permissions: ['allow_join', 'allow_mod'],
+    };
+
+    // Encode secret to Uint8Array
+    const secret = new TextEncoder().encode(VIDEOSDK_SECRET);
+
+    // Generate JWT token using jose
+    const token = await new jose.SignJWT(payload)
+      .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+      .setIssuedAt()
+      .setExpirationTime('24h')
+      .sign(secret);
+
+    console.log('Generated VideoSDK token successfully');
+    return token;
+  } catch (error) {
+    console.error('Error generating token:', error);
+    throw error;
+  }
 };
 
 // Create meeting function
@@ -43,7 +70,16 @@ const createMeeting = async (token: string): Promise<string> => {
       body: JSON.stringify({}),
     });
     
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Create meeting failed:', response.status, errorText);
+      throw new Error(`Failed to create meeting: ${response.status}`);
+    }
+    
     const data = await response.json();
+    if (!data.roomId) {
+      throw new Error('No roomId in response');
+    }
     return data.roomId;
   } catch (error) {
     console.error('Error creating meeting:', error);

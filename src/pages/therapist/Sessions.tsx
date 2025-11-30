@@ -237,18 +237,23 @@ export default function TherapistSessions() {
       const token = await getToken();
       const meetingId = await createMeeting(token);
       
+      if (!meetingId) {
+        throw new Error('Failed to create meeting room');
+      }
+      
       // Update session with video call info including the VideoSDK room ID
       const sessionRef = doc(db, 'sessions', sessionId);
       await updateDoc(sessionRef, {
         videoCallStarted: serverTimestamp(),
         videoCallStatus: 'active',
         videoCallRoomId: meetingId, // Store VideoSDK room ID for patient to join
+        meetingId: meetingId, // Also store as meetingId for consistency
       });
 
       // Update local sessions state with the new room ID
       setSessions(prev => prev.map(s => 
         s.id === sessionId 
-          ? { ...s, videoCallStatus: 'active', videoCallRoomId: meetingId }
+          ? { ...s, videoCallStatus: 'active', videoCallRoomId: meetingId, meetingId: meetingId }
           : s
       ));
 

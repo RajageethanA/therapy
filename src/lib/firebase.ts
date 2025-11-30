@@ -4,13 +4,13 @@ import { getFirestore, Firestore } from 'firebase/firestore';
 
 // Vite exposes env vars prefixed with VITE_ via import.meta.env
 const firebaseConfig = {
-  apiKey: "AIzaSyDdzx9ynfOExOD4EW_HZAMquUO-187SuMs",
-  authDomain: "therapist-cc654.firebaseapp.com",
-  projectId: "therapist-cc654",
-  storageBucket: "therapist-cc654.firebasestorage.app",
-  messagingSenderId: "558739956587",
-  appId: "1:558739956587:web:1ca35fab815b72ad9ae22e",
-  measurementId: "G-CTZKQX6M25"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 let app: FirebaseApp;
