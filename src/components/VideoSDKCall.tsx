@@ -66,20 +66,23 @@ function ParticipantView({ participantId, isLarge = false }: { participantId: st
   const { webcamStream, micStream, webcamOn, micOn, isLocal, displayName } =
     useParticipant(participantId);
 
+  // Handle audio stream - IMPORTANT: Only mute local audio to prevent echo
   useEffect(() => {
     if (micRef.current) {
       if (micOn && micStream) {
         const mediaStream = new MediaStream();
         mediaStream.addTrack(micStream.track);
         micRef.current.srcObject = mediaStream;
+        // Set muted attribute based on whether it's local participant
+        micRef.current.muted = isLocal;
         micRef.current
           .play()
-          .catch((error) => console.error("Audio play failed", error));
+          .catch((error) => console.error("Audio play failed:", error));
       } else {
         micRef.current.srcObject = null;
       }
     }
-  }, [micStream, micOn]);
+  }, [micStream, micOn, isLocal]);
 
   useEffect(() => {
     if (videoRef.current) {
@@ -102,7 +105,8 @@ function ParticipantView({ participantId, isLarge = false }: { participantId: st
         ? "w-full h-full min-h-[400px]" 
         : "w-44 h-32 border-2 border-white/20"
     }`}>
-      <audio ref={micRef} autoPlay muted={isLocal} />
+      {/* Audio element - muted only for local to prevent echo */}
+      <audio ref={micRef} autoPlay playsInline muted={isLocal} />
       {webcamOn ? (
         <video
           ref={videoRef}
