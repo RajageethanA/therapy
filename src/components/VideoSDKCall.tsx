@@ -274,8 +274,15 @@ const MeetingView: React.FC<{
             <div className="text-sm font-mono text-gray-300 bg-black/40 px-2 py-1 rounded">
               {formatDuration(callDuration)}
             </div>
-            <div className="text-xs text-gray-400">
-              Room: {meetingId}
+            <div 
+              className="text-xs text-gray-400 bg-black/40 px-2 py-1 rounded cursor-pointer hover:bg-black/60 transition-colors"
+              onClick={() => {
+                navigator.clipboard.writeText(meetingId || '');
+                alert('Room ID copied! Share this with the patient: ' + meetingId);
+              }}
+              title="Click to copy Room ID"
+            >
+              📋 Room: <span className="font-mono font-bold text-white">{meetingId}</span>
             </div>
           </div>
         </div>

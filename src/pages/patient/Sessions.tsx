@@ -404,33 +404,57 @@ export default function Sessions() {
                                 ) : session.videoCallRequest.status === 'accepted' && session.videoCallStatus === 'active' ? (
                                   // Request accepted and call is active - show room ID input and join button
                                   <div className="flex-1 flex flex-col gap-2">
-                                    <div className="flex gap-2">
-                                      <Input
-                                        placeholder="Enter Room ID from Therapist"
-                                        value={roomIdInput[session.id] || session.meetingId || ''}
-                                        onChange={(e) => setRoomIdInput(prev => ({
-                                          ...prev,
-                                          [session.id]: e.target.value
-                                        }))}
-                                        className="flex-1"
-                                      />
-                                      <Button 
-                                        className="bg-green-600 hover:bg-green-700"
-                                        disabled={!roomIdInput[session.id] && !session.meetingId}
-                                        onClick={() => joinVideoCall(
-                                          session.id, 
-                                          session.therapistId, 
-                                          session.therapistName || therapists[session.therapistId]?.name || 'Therapist',
-                                          roomIdInput[session.id] || session.meetingId || ''
-                                        )}
-                                      >
-                                        <Video className="w-4 h-4 mr-2" />
-                                        Join
-                                      </Button>
-                                    </div>
-                                    <p className="text-xs text-muted-foreground">
-                                      Ask your therapist for the Room ID to join the video call
-                                    </p>
+                                    {session.meetingId || session.videoCallRoomId ? (
+                                      // Room ID available from Firebase - auto join
+                                      <>
+                                        <Button 
+                                          className="w-full bg-green-600 hover:bg-green-700"
+                                          onClick={() => joinVideoCall(
+                                            session.id, 
+                                            session.therapistId, 
+                                            session.therapistName || therapists[session.therapistId]?.name || 'Therapist',
+                                            session.meetingId || session.videoCallRoomId || ''
+                                          )}
+                                        >
+                                          <Video className="w-4 h-4 mr-2" />
+                                          Join Video Session
+                                        </Button>
+                                        <p className="text-xs text-muted-foreground text-center">
+                                          Room ID: <span className="font-mono font-bold">{session.meetingId || session.videoCallRoomId}</span>
+                                        </p>
+                                      </>
+                                    ) : (
+                                      // No Room ID in Firebase - need manual entry
+                                      <>
+                                        <div className="flex gap-2">
+                                          <Input
+                                            placeholder="Enter Room ID from Therapist"
+                                            value={roomIdInput[session.id] || ''}
+                                            onChange={(e) => setRoomIdInput(prev => ({
+                                              ...prev,
+                                              [session.id]: e.target.value
+                                            }))}
+                                            className="flex-1"
+                                          />
+                                          <Button 
+                                            className="bg-green-600 hover:bg-green-700"
+                                            disabled={!roomIdInput[session.id]}
+                                            onClick={() => joinVideoCall(
+                                              session.id, 
+                                              session.therapistId, 
+                                              session.therapistName || therapists[session.therapistId]?.name || 'Therapist',
+                                              roomIdInput[session.id] || ''
+                                            )}
+                                          >
+                                            <Video className="w-4 h-4 mr-2" />
+                                            Join
+                                          </Button>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">
+                                          Ask your therapist for the Room ID to join the video call
+                                        </p>
+                                      </>
+                                    )}
                                   </div>
                                 ) : session.videoCallRequest.status === 'declined' ? (
                                   // Request declined - allow new request
@@ -449,33 +473,57 @@ export default function Sessions() {
                                 ) : session.videoCallRequest.status === 'accepted' ? (
                                   // Request accepted - show room ID input to join
                                   <div className="flex-1 flex flex-col gap-2">
-                                    <div className="flex gap-2">
-                                      <Input
-                                        placeholder="Enter Room ID from Therapist"
-                                        value={roomIdInput[session.id] || ''}
-                                        onChange={(e) => setRoomIdInput(prev => ({
-                                          ...prev,
-                                          [session.id]: e.target.value
-                                        }))}
-                                        className="flex-1"
-                                      />
-                                      <Button 
-                                        className="bg-green-600 hover:bg-green-700"
-                                        disabled={!roomIdInput[session.id]}
-                                        onClick={() => joinVideoCall(
-                                          session.id, 
-                                          session.therapistId, 
-                                          session.therapistName || therapists[session.therapistId]?.name || 'Therapist',
-                                          roomIdInput[session.id] || ''
-                                        )}
-                                      >
-                                        <Video className="w-4 h-4 mr-2" />
-                                        Join
-                                      </Button>
-                                    </div>
-                                    <p className="text-xs text-muted-foreground">
-                                      ✅ Call approved! Enter the Room ID shared by your therapist to join.
-                                    </p>
+                                    {session.meetingId || session.videoCallRoomId ? (
+                                      // Room ID available from Firebase - auto join
+                                      <>
+                                        <Button 
+                                          className="w-full bg-green-600 hover:bg-green-700"
+                                          onClick={() => joinVideoCall(
+                                            session.id, 
+                                            session.therapistId, 
+                                            session.therapistName || therapists[session.therapistId]?.name || 'Therapist',
+                                            session.meetingId || session.videoCallRoomId || ''
+                                          )}
+                                        >
+                                          <Video className="w-4 h-4 mr-2" />
+                                          Join Video Session
+                                        </Button>
+                                        <p className="text-xs text-muted-foreground text-center">
+                                          ✅ Room ID: <span className="font-mono font-bold">{session.meetingId || session.videoCallRoomId}</span>
+                                        </p>
+                                      </>
+                                    ) : (
+                                      // No Room ID in Firebase - need manual entry
+                                      <>
+                                        <div className="flex gap-2">
+                                          <Input
+                                            placeholder="Enter Room ID from Therapist"
+                                            value={roomIdInput[session.id] || ''}
+                                            onChange={(e) => setRoomIdInput(prev => ({
+                                              ...prev,
+                                              [session.id]: e.target.value
+                                            }))}
+                                            className="flex-1"
+                                          />
+                                          <Button 
+                                            className="bg-green-600 hover:bg-green-700"
+                                            disabled={!roomIdInput[session.id]}
+                                            onClick={() => joinVideoCall(
+                                              session.id, 
+                                              session.therapistId, 
+                                              session.therapistName || therapists[session.therapistId]?.name || 'Therapist',
+                                              roomIdInput[session.id] || ''
+                                            )}
+                                          >
+                                            <Video className="w-4 h-4 mr-2" />
+                                            Join
+                                          </Button>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">
+                                          ✅ Call approved! Enter the Room ID shared by your therapist to join.
+                                        </p>
+                                      </>
+                                    )}
                                   </div>
                                 ) : (
                                   // Unknown state - allow new request
